@@ -1,9 +1,9 @@
 
 class Templates:
     @staticmethod
-    def message(text, next=None):
+    def message(message, next=None):
         def action(state):
-            return text, next
+            return message, next
         return action
     
     @staticmethod
