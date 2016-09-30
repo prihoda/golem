@@ -8,7 +8,7 @@ class FacebookTemplates:
         def action(state):
             messages = [TextMessage(m) if isinstance(m, str) else m for m in text]
             if messages:
-                last = message[-1]
+                last = messages[-1]
                 for button in buttons:
                     if isinstance(button, Button):
                         last.create_button(**button)
