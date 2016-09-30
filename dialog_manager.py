@@ -24,6 +24,7 @@ class DialogManager:
         self.log.info('Initializing dialog for user %s...' % uid)
         self.chatbot_version = 'default'
         self.current_state_name = 'default.root'
+        self.context = None
         if version and version.decode('utf-8')==DialogManager.version and self.db.hexists('session_entities', self.uid):
             entities_string = self.db.hget('session_entities', self.uid)
             self.chatbot_version = self.db.hget('session_chatbot_version', self.uid).decode('utf-8')
@@ -31,7 +32,7 @@ class DialogManager:
             state = self.db.hget('session_state', self.uid).decode('utf-8')
             counter = int(self.db.hget('session_counter', self.uid))
             self.log.info('Session exists at state %s (version %s)' % (state, self.chatbot_version))
-            self.move_to(state)
+            self.move_to(state, initializing=True)
             #self.log.info(entities_string)
             entities = json.loads(entities_string.decode('utf-8'), object_hook=json_deserialize)
         else:
@@ -46,8 +47,6 @@ class DialogManager:
         for flow_name,flow_definition in flow_definitions.items():
             self.flows[flow_name] = Flow(flow_name, dialog=self, definition=flow_definition)
         self.current_state_name = 'default.root'
-
-
 
 
     def process(self, raw_message):
@@ -79,21 +78,26 @@ class DialogManager:
         if not self.check_state_transition():
             self.check_intent_transition()
 
-        # Call state action with updated context
-        response, new_state_name = self.get_state().accept_wrapper()
+        self.log.info('** RUNNING ACTION ********************************')
+        self.run_accept()
 
-        # Move to new state if changed
-        moved = self.move_to(new_state_name)
-        self.save_state()
-
+    def run_accept(self):
+        self.log.info('Running ACCEPT action of {}'.format(self.current_state_name))
+        state = self.get_state()
+        if not state.accept:
+            return
+        response, new_state_name = state.accept(state=state)
         self.send_response(response)
+        self.move_to(new_state_name)
 
-        while moved and self.get_state().init:
-            self.log.info('Running init action of {}'.format(self.current_state_name))
-            response, new_state_name = self.get_state().init(state=self.get_state())
-            self.send_response(response)
-            moved = self.move_to(new_state_name)
-            self.save_state()
+    def run_init(self):
+        self.log.info('Running INIT action of {}'.format(self.current_state_name))
+        state = self.get_state()
+        if not state.init:
+            return
+        response, new_state_name = state.init(state=state)
+        self.send_response(response)
+        self.move_to(new_state_name)
 
     def check_version_transition(self):
         new_version = self.context.get('version', max_age=0)
@@ -103,6 +107,7 @@ class DialogManager:
             self.send_response('Sure, moving to %s ;)' % new_version)
             self.log.info('Moving to custom chatbot version: %s' % new_version)
             return True
+        return False
 
     def check_state_transition(self):
         new_state_name = self.context.get('_state', max_age=0)
@@ -142,20 +147,33 @@ class DialogManager:
         flow = self.get_flow(flow_name)
         return flow.get_state(state_name) if flow else None
 
-    def move_to(self, new_state_name):
+    def move_to(self, new_state_name, initializing=False):
         # if flow prefix is not present, add the current one
+        action = 'init'
+        if new_state_name and new_state_name.count(':'):
+            new_state_name,action = new_state_name.split(':',1)
         if new_state_name and ('.' not in new_state_name):
             new_state_name = self.current_state_name.split('.')[0]+'.'+new_state_name
         if not new_state_name or new_state_name == self.current_state_name:
-            return False
+            self.save_state()
+            return
         if not self.get_state(new_state_name):
             self.log.info('Error: State %s does not exist! Staying at %s.' % (new_state_name, self.current_state_name))
-            return False
-        self.log.info('Moving from %s to %s' % (self.current_state_name, new_state_name))
+            self.save_state()
+            return
+        self.log.info('Moving from %s to %s %s' % (self.current_state_name, new_state_name, action))
         self.current_state_name = new_state_name
+        self.save_state()
+        if not initializing:
+            if action=='init':
+                self.run_init()
+            elif action=='accept':
+                self.run_accept()
         return True
 
     def save_state(self):
+        if not self.context:
+            return
         self.log.info('Saving new state %s (%s)' % (self.current_state_name, self.chatbot_version))
         self.db.hset('session_state', self.uid, self.current_state_name)
         self.db.hset('session_entities', self.uid, json.dumps(self.context.entities, default=json_serialize))
@@ -218,13 +236,6 @@ class State:
         for key,state_name in self.intent_transitions.items():
             if re.match(key, intent): return state_name
         return None
-
-    def accept_wrapper(self):
-        if not self.accept:
-            self.dialog.log.info('No accept action at %s, doing nothing...' % self.name)
-            return None,None
-        self.dialog.log.info('Performing %s accept action...' % self.name)
-        return self.accept(state=self)
 
     def __str__(self):
         return self.name + ":state"
