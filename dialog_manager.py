@@ -1,19 +1,23 @@
 from .context import Context
 from .templates import Templates
+from .interfaces.facebook.templates import FacebookTemplates
 from .serialize import json_deserialize,json_serialize
 import json
 import re
+import importlib, logging
 
 class DialogManager:
     version = '1.21'
 
     def __init__(self, config, uid, interface):
-        import importlib
         self.uid = uid
         self.interface = interface
         self.config = config
         self.db = config['GET_STORAGE']()
-        self.log = config['GET_LOGGER'](uid)
+        if config.get('GET_LOGGER'):
+            self.log = config['GET_LOGGER'](uid)
+        if not self.log:
+            self.log = logging.getLogger()
         chatbot_module = importlib.import_module(config['CHATBOT_MODULE'])
         self.create_flows = chatbot_module.create_flows
         entities = {}
@@ -204,9 +208,13 @@ class State:
             return definition
         template = definition.get('template')
         params = definition.get('params') or None
-        if not hasattr(Templates, template):
+        if hasattr(Templates, template):
+            fn = getattr(Templates, template)
+        elif hasattr(FacebookTemplates, template):
+            fn = getattr(FacebookTemplates, template)
+        else:
             raise ValueError('Template %s not found, create a static method Templates.%s' % (template))
-        fn = getattr(Templates, template)
+        
         return fn(**params)
 
     def get_intent_transition(self, intent):
