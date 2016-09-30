@@ -75,11 +75,10 @@ class DialogManager:
         self.log.info('++ PROCESSING ++++++++++++++++++++++++++++++++++++')
 
         self.check_version_transition()
+        
         if not self.check_state_transition():
-            self.check_intent_transition()
-
-        self.log.info('** RUNNING ACTION ********************************')
-        self.run_accept()
+            if not self.check_intent_transition():
+                self.run_accept()
 
     def run_accept(self):
         self.log.info('Running ACCEPT action of {}'.format(self.current_state_name))
@@ -134,6 +133,7 @@ class DialogManager:
             print('Error! Found intent "%s" but no flow present for it!' % intent)
             return False
 
+        new_state_name = new_state_name+':accept'
         self.log.info('Moving based on intent %s...' % (intent))
         return self.move_to(new_state_name)
 
@@ -156,11 +156,11 @@ class DialogManager:
             new_state_name = self.current_state_name.split('.')[0]+'.'+new_state_name
         if not new_state_name or new_state_name == self.current_state_name:
             self.save_state()
-            return
+            return False
         if not self.get_state(new_state_name):
             self.log.info('Error: State %s does not exist! Staying at %s.' % (new_state_name, self.current_state_name))
             self.save_state()
-            return
+            return False
         self.log.info('Moving from %s to %s %s' % (self.current_state_name, new_state_name, action))
         self.current_state_name = new_state_name
         self.save_state()
