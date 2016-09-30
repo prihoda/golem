@@ -34,7 +34,8 @@ class GetStartedSetting(ThreadSetting):
 
 class MenuSetting(ThreadSetting):
     def __init__(self, elements=None):
-        self.elements = elements or []
+        self.elements = [MenuElement(**element) for element in elements or []]
+
 
     def to_response(self):
         return {
@@ -112,8 +113,8 @@ class SenderActionMessage(MessageElement):
 class TextMessage(MessageElement):
     def __init__(self, text='', buttons=None, quick_replies=None):
         self.text = text
-        self.buttons = buttons or []
-        self.quick_replies = quick_replies or []
+        self.buttons = [Button(**button) for button in buttons or []]
+        self.quick_replies = [QuickReply(**reply) for reply in quick_replies or []]
 
     def to_response(self):
         if self.buttons:
@@ -162,7 +163,7 @@ class TextMessage(MessageElement):
 
 class GenericTemplateMessage(MessageElement):
     def __init__(self, elements=None):
-        self.elements = elements or []
+        self.elements = [GenericTemplateElement(**element) for element in elements or []]
 
     def to_response(self):
         return {
@@ -209,7 +210,7 @@ class GenericTemplateElement(MessageElement):
         self.image_url = image_url
         self.subtitle = subtitle
         self.item_url = item_url
-        self.buttons = buttons or []
+        self.buttons = [Button(**button) for button in buttons or []]
 
     def to_response(self):
         response = {
