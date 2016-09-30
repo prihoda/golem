@@ -1,6 +1,5 @@
 from .context import Context
 from .templates import Templates
-from .interfaces.facebook.templates import FacebookTemplates
 from .serialize import json_deserialize,json_serialize
 import json
 import re
@@ -210,8 +209,6 @@ class State:
         params = definition.get('params') or None
         if hasattr(Templates, template):
             fn = getattr(Templates, template)
-        elif hasattr(FacebookTemplates, template):
-            fn = getattr(FacebookTemplates, template)
         else:
             raise ValueError('Template %s not found, create a static method Templates.%s' % (template))
         
