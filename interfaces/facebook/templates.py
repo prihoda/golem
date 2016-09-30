@@ -6,7 +6,7 @@ class FacebookTemplates:
         if not isinstance(text, list):
             text = [text]
         def action(state):
-            messages = [TextMessage(text) for t in text]
+            messages = [TextMessage(m) if isinstance(m, str) else m for m in text]
             if messages:
                 last = message[-1]
                 for button in buttons:
