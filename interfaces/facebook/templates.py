@@ -11,14 +11,14 @@ class FacebookTemplates:
                 last = messages[-1]
                 for button in buttons:
                     if isinstance(button, Button):
-                        last.create_button(**button)
-                    else:
                         last.add_button(button)
+                    else:
+                        last.create_button(**button)
                 for quick_reply in quick_replies:
                     if isinstance(quick_reply, QuickReply):
-                        last.create_quick_reply(**quick_reply)
-                    else:
                         last.add_quick_reply(quick_reply)
+                    else:
+                        last.create_quick_reply(**quick_reply)
             return messages, next
         return action
     
