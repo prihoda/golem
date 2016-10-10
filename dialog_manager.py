@@ -1,18 +1,19 @@
 from .context import Context
 from .templates import Templates
 from .serialize import json_deserialize,json_serialize
+from .persistence import get_redis
 import json
 import re
 import importlib, logging
 
 class DialogManager:
-    version = '1.21'
+    version = '1.25'
 
     def __init__(self, config, uid, interface):
         self.uid = uid
         self.interface = interface
         self.config = config
-        self.db = config['GET_STORAGE']()
+        self.db = get_redis()
         if config.get('GET_LOGGER'):
             self.log = config['GET_LOGGER'](uid)
         if not self.log:
@@ -23,10 +24,11 @@ class DialogManager:
         version = self.db.get('dialog_version')
         self.log.info('Initializing dialog for user %s...' % uid)
         self.chatbot_version = 'default'
-        self.current_state_name = 'default.root'
+        self.current_state_name = None
         self.context = None
         if version and version.decode('utf-8')==DialogManager.version and self.db.hexists('session_entities', self.uid):
             entities_string = self.db.hget('session_entities', self.uid)
+            history_string = self.db.hget('session_history', self.uid)
             self.chatbot_version = self.db.hget('session_chatbot_version', self.uid).decode('utf-8')
             self.init_flows()
             state = self.db.hget('session_state', self.uid).decode('utf-8')
@@ -35,11 +37,14 @@ class DialogManager:
             self.move_to(state, initializing=True)
             #self.log.info(entities_string)
             entities = json.loads(entities_string.decode('utf-8'), object_hook=json_deserialize)
+            history = json.loads(history_string.decode('utf-8'), object_hook=json_deserialize)
         else:
+            self.current_state_name = 'default.root'
             self.log.info('Creating new session...')
             counter = 0
+            history = []
             self.init_flows()
-        self.context = Context(counter=counter, entities=entities, dialog=self)
+        self.context = Context(entities=entities, history=history, counter=counter, dialog=self)
 
     def init_flows(self):
         self.flows = {}
@@ -50,14 +55,14 @@ class DialogManager:
 
 
     def process(self, raw_message):
-        self.log.info('MARKING PROCESSED MESSAGE FOR {}'.format(self.uid))
+        #self.log.info('MARKING PROCESSED MESSAGE FOR {}'.format(self.uid))
         self.interface.processing_start(self.uid)
 
-        self.log.info('PROCESSING MESSAGE: {}'.format(raw_message))
+        #self.log.info('PROCESSING MESSAGE: {}'.format(raw_message))
         # Parse new message and add entities to context
         parsed = self.interface.parse_message(raw_message)
 
-        self.log.info('PARSED MESSAGE: {}'.format(parsed))
+        #self.log.info('PARSED MESSAGE: {}'.format(parsed))
 
         # Only process messages and postbacks (not 'seen_by's, etc)
         if parsed['type'] not in ['message','postback']:
@@ -66,6 +71,7 @@ class DialogManager:
         debug_entities = self.context.get('debug_entities')
         if debug_entities and bool(int(debug_entities)):
             for entity,values in parsed['entities'].items():
+                if not values or entity=='_message_text': continue
                 self.send_response("{}: {}".format(entity, values))
 
         self.log.info('-- USER message ----------------------------------')
@@ -78,16 +84,24 @@ class DialogManager:
         
         if not self.check_state_transition():
             if not self.check_intent_transition():
-                self.run_accept()
+                self.run_accept(save_identical=True)
+                self.save_state()
 
-    def run_accept(self):
+    def save_transition(self):
+        from_state = self.context.get_history_string(index=-1)
+        to_state = self.context.get_history_string(index=None)
+        key = '{}->{}'.format(from_state, to_state)
+        self.log.info("TRANSITION: {}".format(key))
+        self.db.hincrby('transitions', key, 1)
+
+    def run_accept(self, save_identical=False):
         self.log.info('Running ACCEPT action of {}'.format(self.current_state_name))
         state = self.get_state()
         if not state.accept:
             return
         response, new_state_name = state.accept(state=state)
         self.send_response(response)
-        self.move_to(new_state_name)
+        self.move_to(new_state_name, save_identical=save_identical)
 
     def run_init(self):
         self.log.info('Running INIT action of {}'.format(self.current_state_name))
@@ -147,28 +161,36 @@ class DialogManager:
         flow = self.get_flow(flow_name)
         return flow.get_state(state_name) if flow else None
 
-    def move_to(self, new_state_name, initializing=False):
+    def move_to(self, new_state_name, initializing=False, save_identical=False):
         # if flow prefix is not present, add the current one
         action = 'init'
+        if isinstance(new_state_name, int):
+            new_state = self.context.get_history_state(new_state_name-1)
+            new_state_name = new_state['name'] if new_state else None
+            action = None
+        if not new_state_name:
+            new_state_name = self.current_state_name
         if new_state_name and new_state_name.count(':'):
             new_state_name,action = new_state_name.split(':',1)
         if new_state_name and ('.' not in new_state_name):
             new_state_name = self.current_state_name.split('.')[0]+'.'+new_state_name
-        if not new_state_name or new_state_name == self.current_state_name:
-            self.save_state()
-            return False
         if not self.get_state(new_state_name):
             self.log.info('Error: State %s does not exist! Staying at %s.' % (new_state_name, self.current_state_name))
-            self.save_state()
             return False
-        self.log.info('Moving from %s to %s %s' % (self.current_state_name, new_state_name, action))
+        identical = new_state_name == self.current_state_name
+        if not initializing and (not identical or save_identical):
+            self.context.add_state(new_state_name)
+            self.save_transition()
+        if not new_state_name or identical:
+            return False
         self.current_state_name = new_state_name
-        self.save_state()
         if not initializing:
+            self.log.info('MOVING %s -> %s %s' % (self.current_state_name, new_state_name, action))
             if action=='init':
                 self.run_init()
             elif action=='accept':
                 self.run_accept()
+        self.save_state()
         return True
 
     def save_state(self):
@@ -176,6 +198,7 @@ class DialogManager:
             return
         self.log.info('Saving new state %s (%s)' % (self.current_state_name, self.chatbot_version))
         self.db.hset('session_state', self.uid, self.current_state_name)
+        self.db.hset('session_history', self.uid, json.dumps(self.context.history, default=json_serialize))
         self.db.hset('session_entities', self.uid, json.dumps(self.context.entities, default=json_serialize))
         self.db.hset('session_counter', self.uid, self.context.counter)
         self.db.hset('session_chatbot_version', self.uid, self.chatbot_version)

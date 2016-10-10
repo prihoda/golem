@@ -204,6 +204,16 @@ class AttachmentMessage(MessageElement):
             }
         }
 
+# TODO stickers not yet supported by Messenger :(
+#class StickerMessage(MessageElement):
+#    def __init__(self, sticker_id):
+#        self.sticker_id = sticker_id
+#
+#    def to_response(self):
+#        return {
+#            "sticker_id": self.sticker_id
+#        }
+    
 class GenericTemplateElement(MessageElement):
     def __init__(self, title, image_url=None, subtitle=None, item_url=None, buttons=None):
         self.title = title

@@ -7,10 +7,11 @@ class Templates:
         return action
     
     @staticmethod
-    def input(entity, missing_message=None, max_age=0, next=None):
+    def input(entity, missing_message=None, accept_text=False, next=None):
         def action(state):
-            value = state.dialog.context.get(entity, max_age=max_age)
-            if not value:
+            if accept_text:
+                state.dialog.context.set(entity, {"value":state.dialog.context.get('_message_text')})
+            elif not state.dialog.context.get(entity, max_age=0):
                 return missing_message, None
             return None, next
         return action
