@@ -6,6 +6,8 @@ import json
 import re
 import importlib, logging
 
+
+
 class DialogManager:
     version = '1.25'
 
@@ -18,7 +20,12 @@ class DialogManager:
             self.log = config['GET_LOGGER'](uid)
         if not self.log:
             self.log = logging.getLogger()
-        chatbot_module = importlib.import_module(config['CHATBOT_MODULE'])
+        #isinstance(interface, TelegramInterface) is not possible to use cause circe dependencies
+        if uid[0] == 't':
+            chatbot_module = importlib.import_module(config['TELEGRAM_CHATBOT_MODULE'])
+        elif uid[0] == 'f':
+            chatbot_module = importlib.import_module(config['FACEBOOK_CHATBOT_MODULE'])
+
         self.create_flows = chatbot_module.create_flows
         entities = {}
         version = self.db.get('dialog_version')
@@ -81,7 +88,7 @@ class DialogManager:
         self.log.info('++ PROCESSING ++++++++++++++++++++++++++++++++++++')
 
         self.check_version_transition()
-        
+
         if not self.check_state_transition():
             if not self.check_intent_transition():
                 self.run_accept(save_identical=True)
@@ -252,7 +259,7 @@ class State:
             fn = getattr(Templates, template)
         else:
             raise ValueError('Template %s not found, create a static method Templates.%s' % (template))
-        
+
         return fn(**params)
 
     def get_intent_transition(self, intent):

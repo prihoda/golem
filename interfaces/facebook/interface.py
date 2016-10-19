@@ -74,7 +74,7 @@ class FacebookInterface():
                 graph_request_mode = "thread_settings"
             else:
                 raise ValueError('Error: Invalid message type: {}: {}'.format(type(response), response))
-            
+
             prefix_post_message_url = 'https://graph.facebook.com/v2.6/me/'
             token = FacebookInterface.config['FB_PAGE_TOKEN']
             post_message_url = prefix_post_message_url+graph_request_mode+'?access_token='+token
@@ -142,4 +142,3 @@ class FacebookInterface():
                 # TODO: add attachment type by extension
                 entities['attachment'].append({'value':url})
         return {'entities' : entities, 'type':'message'}
-

@@ -1,0 +1,7 @@
+requests
+wit
+python-dateutil
+facebook-sdk
+redis
+emoji
+image
