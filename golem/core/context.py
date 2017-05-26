@@ -66,7 +66,7 @@ class Context:
             if value.get('value') in ignored_values:
                 self.dialog.log.info('Skipping ignored entity value: {}={}'.format(entity, value.get('value')))
                 continue
-            values.append(value.get(key) if key else value)
+            values.append(value.get(key) if key else value.copy())
             # if I already have enough values, stop looking
             if limit is not None and len(values) >= limit:
                 break
@@ -89,6 +89,7 @@ class Context:
         if entity not in self.entities:
             return values
         found_age = None
+        existing = []
         for value in self.entities[entity]:
             age = self.counter-value['counter']
             value['age'] = age
@@ -98,9 +99,10 @@ class Context:
             if found_age is not None and age > found_age:
                 break
             found_age = age
-            if value in values:
+            if value.get('value') in existing:
                 # skip duplicates
                 continue
+            existing.append(value.get('value'))
             values.append(value.get(key) if key else value)
         return values[::-1]
 
