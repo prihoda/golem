@@ -30,14 +30,14 @@ class UserTextMessage(UserMessage):
         for entity in self.entities:
             expected_value = self.entities[entity]
             if entity not in parsed['entities']:
-                raise ConversationTestException('Expected entity "{}" not extracted from message "{}".'.format(entity, self.text))
+                raise ConversationTestException('- Expected entity "{}" not extracted from message "{}".'.format(entity, self.text))
             elif expected_value:
                 value = parsed['entities'][entity][0]['value']
                 if expected_value != value:
-                    raise ConversationTestException('Extracted "{}" instead of "{}" in entity "{}" from message "{}".'.format(value, expected_value, entity, self.text))
-                TestLog.log('Extracted expected value "{}" of entity "{}".'.format(value, entity))
+                    raise ConversationTestException('- Extracted "{}" instead of "{}" in entity "{}" from message "{}".'.format(value, expected_value, entity, self.text))
+                TestLog.log('- Extracted expected value "{}" of entity "{}".'.format(value, entity))
             else:
-                TestLog.log('Extracted any value of expected entity "{}".'.format(entity))
+                TestLog.log('- Extracted expected entity "{}".'.format(entity))
 
         return parsed
 
@@ -65,21 +65,22 @@ class BotMessage():
         return self
 
     def check(self, message):
-        print('Checking: {}'.format(message))
-        if message is None:
-            raise ConversationTestException('Expected message type {} but no message returned by bot.'.format(self.klass.__name__))
-        if not isinstance(message, self.klass):
-            raise ConversationTestException('Expected message type {} but received {} from bot: "{}".'.format(self.klass.__name__, type(message).__name__, message))
+        TestLog.log('Checking message: {}'.format(message))
         
-        TestLog.log('Received expected {} from bot: "{}".'.format(self.klass.__name__, message))
+        if message is None:
+            raise ConversationTestException('- Expected message type {} but no message returned by bot.'.format(self.klass.__name__))
+        if not isinstance(message, self.klass):
+            raise ConversationTestException('- Expected message type {} but received {} from bot: "{}".'.format(self.klass.__name__, type(message).__name__, message))
+        
+        TestLog.log('- Received expected {} from bot: "{}".'.format(self.klass.__name__, message))
 
         if self.text:
             if not isinstance(message, TextMessage):
-                raise ConversationTestException('Only text messages can be checked for text content, but received {}.'.format(type(message)))
+                raise ConversationTestException('- Only text messages can be checked for text content, but received {}.'.format(type(message)))
             if self.text != message.text:
-                raise ConversationTestException('Expected text content "{}" but received "{}"'.format(self.text, message.text))
+                raise ConversationTestException('- Expected text content "{}" but received "{}"'.format(self.text, message.text))
     
-            TestLog.log('Received expected message text "{}" from bot.'.format(self.text))
+            TestLog.log('- Received expected message text "{}" from bot.'.format(self.text))
 
         return True
 
@@ -88,7 +89,7 @@ class StateChange():
         self.name = name
 
     def check(self, state):
-        print('Checking: {}'.format(state))
+        TestLog.log('Checking state: {}'.format(state))
         if state is None:
             raise ConversationTestException('Expected new state {} but no state change occurred.'.format(self.name))
         if self.name != state:
