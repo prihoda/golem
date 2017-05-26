@@ -85,7 +85,7 @@ class DialogManager:
 
         entities = self.context.add_entities(entities)
 
-        if self.test_record_message():
+        if self.test_record_message(message_type, entities):
             return
 
         if message_type != 'schedule':
@@ -126,7 +126,7 @@ class DialogManager:
             accept_inactivity_callback.apply_async((self.interface.name, self.uid, self.context.counter, name, seconds), countdown=seconds)
 
 
-    def test_record_message(self):
+    def test_record_message(self, message_type, entities):
         record, record_age = self.context.get_age('test_record')
         self.recording = False
         if not record:
@@ -141,7 +141,7 @@ class DialogManager:
             self.save_state()
             return True
         if record == 'start':
-            ConversationTestRecorder.record_user_message(parsed['type'], entities)
+            ConversationTestRecorder.record_user_message(message_type, entities)
             self.recording = True
         return False
 
