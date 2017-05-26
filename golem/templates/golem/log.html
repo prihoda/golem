@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Message log - Golem utils</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style type="text/css"></style>
+<style>
+body{
+ font-family: sans-serif;
+}
+.message-list {
+  width: 500px;
+}
+.message-bubble {
+  display: block;
+  margin: 2px;
+  padding: 4px 12px;
+  background: #e0e0e0;
+  border-radius: 5px;
+  max-width: 400px;
+  font-size: 120%;
+}
+.message-button {
+  display: inline-block;
+  min-width: 100px;
+  margin: 2px;
+  padding: 4px 12px;
+  border-radius: 5px;
+  font-size: 120%;
+  border: 1px solid #60b0ff;
+  background: #f0f0f0;
+  color: #4080ff;
+  margin-top: 4px;
+}
+.message-quick-reply {
+  display: inline-block;
+  margin: 2px;
+  padding: 4px 12px;
+  border-radius: 5px;
+  font-size: 90%;
+  border: 1px solid #60b0ff;
+  background: #f0f0f0;
+  color: #4080ff;
+  margin-top: 4px;
+}
+.message-bot {
+
+}
+.message-user .message-bubble{
+  background-color: #4080ff;
+  color: white;
+
+}
+.message-switch {
+  margin-top: 10px;
+}
+.message-elements-scroller {
+  margin-bottom: 5px;
+}
+.message-elements {
+  margin-bottom: 5px;
+}
+.message-element-wrapper {
+  display: inline-block;
+  margin-right: 10px;
+}
+.message-element-button {
+  display: block;
+}
+.message-element {
+  display: block;
+  width: 200px;
+  background: #eee;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+.message-element-image {
+  display: block;
+  background-size: cover;
+  background-position: center center;
+  height: 120px;
+}
+.message-element-title {
+  font-weight: bold;
+  font-size: 100%;
+  padding: 2px 5px;
+  max-height: 44px;
+  overflow: hidden;
+}
+.message-element-subtitle {
+  color: #666;
+  font-size: 80%;
+  padding: 2px 5px;
+  max-height: 20px;
+  overflow: hidden;
+}
+.m-error {
+  color: red;
+  background: #ffeeee;
+}
+.m-postback {
+  font-style: italic;
+  -webkit-box-shadow: inset 2px 2px 6px 0px rgba(5,28,69,0.7);
+  -moz-box-shadow: inset 2px 2px 6px 0px rgba(5,28,69,0.7);
+  box-shadow: inset 2px 2px 6px 0px rgba(5,28,69,0.7);
+
+}
+.log-conversation {
+  display: block;
+  padding: 10px 15px;
+  border-bottom: 1px solid #bbb;
+  background: #eee;
+  text-decoration: none;
+  color: black;
+}
+.log-conversation strong {
+  text-decoration: none;
+  color: black;
+}
+.log-conversation:hover {
+  background: #f8f8f8;
+  text-decoration: none;
+  color: #222;
+}
+.log-conversation.active {
+  background: white;
+  text-decoration: none;
+  color: black;
+}
+#header {
+  height: 10vh;
+}
+#content {
+  height: 500px;
+  height: 85vh;
+  overflow: auto;
+  overflow-x: hidden;
+}
+#log-conversations {
+  border: 1px solid #bbb;
+  height: 85vh;
+  overflow-y: auto;
+  background: #f0f0f0;
+}
+.show-older {
+  cursor: pointer;
+  display: block;
+  text-align: center;
+  background: #f0f0f0;
+  padding: 10px 0;
+  text-decoration: none;
+}
+</style>
+<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+<script   src="https://code.jquery.com/jquery-3.1.1.min.js"   integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8="   crossorigin="anonymous"></script> 
+</head>
+<body>
+
+<div class="container">
+  <div class="row">
+  <div class="col-xs-12" id="header">
+  <h3>Messages</h3>
+  </div>
+  </div>
+  <div class="row">
+    <div class="col-xs-6 col-sm-3">
+      <div id="log-conversations">
+      {% for user in users %}
+        <a class="log-conversation" href="#{{ user.uid }}">
+        <strong>{% if user.profile %}{{ user.profile.first_name }} {{ user.profile.last_name }}{% else %}<em>{{ user.uid }}</em>{% endif %}</strong>
+        </a>
+        
+      {% endfor %}
+      </div>
+    </div>
+    <div class="col-xs-6 col-sm-9" id="content">
+      Loading...
+    </div>
+  </div>
+</div>
+<script type="text/javascript">
+
+var page = 1;
+$(function(){
+
+  var uid = window.location.hash.replace('#','');
+  if(!uid) {
+    uid = $('.log-conversation').eq(0).attr('href').replace('#','')
+  }
+  load_user(uid, page);
+  $(window).bind('hashchange', function(){
+    page = 1;
+    load_user(window.location.hash.replace('#',''), page)
+  })
+  $(document).on('click', '.message', function(){
+      meta = $(this).data('meta')
+      //console.log('-- '+ $(this).find('.message-bubble').text()+' -------------')
+      console.log(meta)
+      var $debug = $(this).find('.debug');
+      $debug.html('')
+      if(meta.entities) {
+        for(var key in meta.entities) {
+          for(var i in meta.entities[key]) {
+            var entity = meta.entities[key][i];
+            console.log(key, entity['value'], entity) 
+            $debug.append(key+": "+entity['value']+"<br>")
+          }
+        }
+      }
+    })
+
+})
+
+
+  
+
+function load_user(uid, page){
+  if(!uid) return;
+  $('.log-conversation').removeClass('active');
+  $('a[href="#'+uid+'"]').addClass('active');
+
+
+  var $content = $('#content')
+  if(page == 1){
+    $content.html('')
+  }
+  $.get(url='/golem/log_user/'+uid+'/'+page, {}, function(data){
+    var $div = $('<div />')
+    var $older = $('<a/>')
+
+    $older.attr('class','show-older')
+    $older.text('Load older...')
+    $older.click(function(){
+      $(this).hide()
+      page += 1
+      load_user(uid, page)
+    })
+    $div.append($older)
+    $div.append(data)
+
+    $content.prepend($div)
+
+    if(page == 1){
+      setTimeout(function(){
+        $content.scrollTop($content.prop("scrollHeight"));
+      }, 100)
+    }
+  })
+
+
+}
+</script>
+</body>
+</html>

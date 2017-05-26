@@ -1,5 +1,5 @@
 import json
-from golem.serialize import json_serialize
+from golem.core.serialize import json_serialize
 
 class ThreadSetting():
     def to_response(self):
@@ -9,12 +9,6 @@ class GreetingSetting(ThreadSetting):
     def __init__(self, message):
         self.message = message
 
-    def to_response(self):
-        return {
-                "greeting": {'text' : self.message},
-                "setting_type": "greeting"
-            }
-
     def __str__(self):
         return 'greeting_setting'
 
@@ -22,27 +16,12 @@ class GetStartedSetting(ThreadSetting):
     def __init__(self, payload):
         self.payload = payload
 
-    def to_response(self):
-        return {
-                "call_to_actions": [{'payload' : json.dumps(self.payload, default=json_serialize)}],
-                "setting_type": "call_to_actions",
-                "thread_state": "new_thread"
-            }
-
     def __str__(self):
         return 'get_started_setting'
 
 class MenuSetting(ThreadSetting):
     def __init__(self, elements=None):
         self.elements = [MenuElement(**element) for element in elements or []]
-
-
-    def to_response(self):
-        return {
-                "call_to_actions": [element.to_response() for element in self.elements[:10]],
-                "setting_type": "call_to_actions",
-                "thread_state": "existing_thread"
-            }
 
     def __str__(self):
         text = 'menu:'
@@ -66,18 +45,6 @@ class MenuElement():
         self.title = title
         self.payload = payload
         self.url = url
-
-    def to_response(self):
-        response = {
-            "title": self.title,
-            "type": self.type,
-        }
-        if self.payload:
-            response['payload'] = json.dumps(self.payload, default=json_serialize)
-        if self.url:
-            response['url'] = self.url
-
-        return response
 
     def __str__(self):
         text = 'element: '+self.title

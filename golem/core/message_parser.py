@@ -4,6 +4,9 @@ import re
 from datetime import timedelta
 import datetime
 import emoji
+from .persistence import get_redis
+import pickle
+from django.conf import settings  
 
 def teach_wit(wit_token, entity, values, doc=""):
     import requests
@@ -21,14 +24,37 @@ def teach_wit(wit_token, entity, values, doc=""):
     )
     if rsp.status_code > 200:
         raise ValueError('Wit responded with status: ' + str(rsp.status_code) +
-                       ' (' + rsp.reason + ')')
+                       ' (' + rsp.reason + '): ' + rsp.text)
     json = rsp.json()
     if 'error' in json:
         raise ValueError('Wit responded with an error: ' + json['error'])
 
-def parse_text_message(config, text, num_tries=1):
+def clear_wit_cache():
+    cache = settings.GOLEM_CONFIG.get('WIT_CACHE')
+    if cache:
+        print('Clearing Wit cache...')
+        db = get_redis()    
+        db.delete('wit_cache')
+        
+clear_wit_cache()
+
+def parse_text_message(text, num_tries=1):
+    wit_token = settings.GOLEM_CONFIG.get('WIT_TOKEN')
+    if not wit_token:
+        return {'type':'message','entities': {'_message_text' : {'value':text}}}
+
+    cache_key = 'wit_cache'
+    cache = settings.GOLEM_CONFIG.get('WIT_CACHE')
+
+    if cache:
+        db = get_redis()
+        if db.hexists('wit_cache', text):
+            parsed = pickle.loads(db.hget('wit_cache', text))
+            print('Got cached wit key: "{}" = {}'.format(cache_key, parsed))
+            return parsed
+
     try:
-        wit_client = Wit(access_token=config['WIT_TOKEN'], actions={})
+        wit_client = Wit(access_token=wit_token, actions={})
         wit_parsed = wit_client.message(text)
         #print(wit_parsed)
     except Exception as e:
@@ -37,7 +63,7 @@ def parse_text_message(config, text, num_tries=1):
         if num_tries > 5:
             raise
         else:
-            return parse_text_message(config, text, num_tries=num_tries+1)
+            return parse_text_message(text, num_tries=num_tries+1)
 
     entities = wit_parsed['entities']
     print('WIT ENTITIES:', entities)
@@ -45,6 +71,13 @@ def parse_text_message(config, text, num_tries=1):
     for entity,values in entities.items():
         # parse datetimes to date_intervals
         if entity == 'datetime':
+            '''
+            Output example:
+                Q: next_week: (datetime.datetime(2016, 11, 21, 0, 0, tzinfo=tzoffset(None, 3600)), datetime.datetime(2016, 11, 28, 0, 0, tzinfo=tzoffset(None, 3600)))
+                Q: tomorrow: (datetime.datetime(2016, 11, 18, 0, 0, tzinfo=tzoffset(None, 3600)), datetime.datetime(2016, 11, 19, 0, 0, tzinfo=tzoffset(None, 3600)))
+                Q: tonight: (datetime.datetime(2016, 11, 17, 18, 0, tzinfo=tzoffset(None, 3600)), datetime.datetime(2016, 11, 18, 0, 0, tzinfo=tzoffset(None, 3600)))
+                Q: at weekend: (datetime.datetime(2016, 11, 18, 18, 0, tzinfo=tzoffset(None, 3600)), datetime.datetime(2016, 11, 21, 0, 0, tzinfo=tzoffset(None, 3600)))
+            '''
             append['date_interval'] = []
             for value in values:
                 try:
@@ -79,10 +112,16 @@ def parse_text_message(config, text, num_tries=1):
         entities[entity] += values
 
     entities['_message_text'] = [{'value':text}]
-    return {'entities':entities, 'type':'message'}
+
+    parsed = {'entities':entities, 'type':'message'}
+    
+    if cache and 'date_interval' not in entities:
+        print('Caching wit key: {} = {}'.format(text, parsed))
+        db.hset('wit_cache', text, pickle.dumps(parsed))
+    return parsed
 
 def parse_additional_entities(text):
-    entities = {'emoji':[], 'intent':[]}
+    entities = {}
     chars = {':)':':slightly_smiling_face:', '(y)':':thumbs_up_sign:', ':(':':disappointed_face:',':*':':kissing_face:',':O':':face_with_open_mouth:',':D':':grinning_face:','<3':':heavy_black_heart:️',':P':':face_with_stuck-out_tongue:'}
     demojized = emoji.demojize(text)
     char_emojis = re.compile(r'(' + '|'.join(chars.keys()).replace('(','\(').replace(')','\)').replace('*','\*') + r')')
@@ -90,6 +129,8 @@ def parse_additional_entities(text):
     if demojized != text:
         match = re.compile(r':([a-zA-Z_0-9]+):')
         for emoji_name in re.findall(match, demojized):
+            if 'emoji' not in entities:
+                entities['emoji'] = []
             entities['emoji'].append({'value':emoji_name})
         #if re.match(match, demojized):
         #    entities['intent'].append({'value':'emoji'})
