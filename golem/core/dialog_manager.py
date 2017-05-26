@@ -14,7 +14,7 @@ from .logger import Logger
 from golem.tasks import accept_inactivity_callback, accept_schedule_callback
 
 class DialogManager:
-    version = '1.27'
+    version = '1.28'
 
     def __init__(self, uid, interface):
         self.uid = uid
@@ -115,6 +115,10 @@ class DialogManager:
         else:
             raise Exception('Specify either "at" or "seconds" parameter')
 
+    def inactive(self, callback_name, seconds):
+        self.log.info('Setting inactivity callback "{}" after {} seconds'.format(callback_name, seconds))
+        accept_inactivity_callback.apply_async((self.interface.name, self.uid, self.context.counter, callback_name, seconds), countdown=seconds)
+
     def save_inactivity_callback(self):
         self.db.hset('session_active', self.uid, time.time())
         callbacks = settings.GOLEM_CONFIG.get('INACTIVE_CALLBACKS')
@@ -122,8 +126,7 @@ class DialogManager:
             return
         for name in callbacks:
             seconds = callbacks[name]
-            self.log.info('Setting inactivity callback "{}" after {} seconds'.format(name, seconds))
-            accept_inactivity_callback.apply_async((self.interface.name, self.uid, self.context.counter, name, seconds), countdown=seconds)
+            self.inactive(name, seconds)
 
 
     def test_record_message(self, message_type, entities):
@@ -248,7 +251,6 @@ class DialogManager:
     def save_state(self):
         if not self.context:
             return
-        print('Saving context counter: {}'.format(self.context.counter))
         self.log.info('Saving state at %s' % (self.current_state_name))
         self.db.hset('session_state', self.uid, self.current_state_name)
         self.db.hset('session_history', self.uid, json.dumps(self.context.history, default=json_serialize))
@@ -258,27 +260,27 @@ class DialogManager:
         self.db.set('dialog_version', DialogManager.version)
 
 
-    def send_response(self, response):
-        if not response:
+    def send_response(self, responses):
+        if not responses:
             return
         self.log.info('-- CHATBOT message -------------------------------')
 
-        if isinstance(response, list):
-            for resp in response:
-                self.send_response(resp)
-            return
+        if not isinstance(responses, list):
+            return self.send_response([responses])
 
-        if isinstance(response, str):
-            response = TextMessage(text=response)
+        for response in responses:
+            if isinstance(response, str):
+                response = TextMessage(text=response)
 
-        # Send the response
-        self.interface.post_message(self.uid, response)
+            # Send the response
+            self.interface.post_message(self.uid, response)
 
-        # Record if recording
-        if self.recording:
-            ConversationTestRecorder.record_bot_message(response)
+            # Record if recording
+            if self.recording:
+                ConversationTestRecorder.record_bot_message(response)
 
-        # Log the response
-        self.log.info('Message: {}'.format(response))
-        self.logger.log_bot_message(response, self.current_state_name)
+        for response in responses:
+            # Log the response
+            self.log.info('Message: {}'.format(response))
+            self.logger.log_bot_message(response, self.current_state_name)
 

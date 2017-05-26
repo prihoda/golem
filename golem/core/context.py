@@ -29,7 +29,7 @@ class Context:
             inserted[entity] = deepcopy(values)
             # prepend each value to start of the list with 0 age 
             for value in values:
-                self.dialog.log.info('Entity %s: %s' % (entity, value['value']))
+                self.dialog.log.info('Entity %s: %s' % (entity, value.get('value')))
                 value['counter'] = self.counter
                 self.entities[entity] = [value] + self.entities[entity]
         return inserted
@@ -53,7 +53,7 @@ class Context:
     def get_history_state(self, index):
         return self.history[index] if len(self.history) >= abs(index) else None
 
-    def get_all(self, entity, max_age=None, limit=None, key='value'):
+    def get_all(self, entity, max_age=None, limit=None, key='value', ignored_values=[]):
         values = []
         if entity not in self.entities:
             return values
@@ -63,23 +63,26 @@ class Context:
             # if I found a too old value, stop looking
             if max_age is not None and age > max_age:
                 break
+            if value.get('value') in ignored_values:
+                self.dialog.log.info('Skipping ignored entity value: {}={}'.format(entity, value.get('value')))
+                continue
             values.append(value.get(key) if key else value)
             # if I already have enough values, stop looking
             if limit is not None and len(values) >= limit:
                 break
         return values 
     
-    def get(self, entity, max_age=None, key='value'):
-        values = self.get_all(entity, max_age=max_age, limit=1, key=key)
+    def get(self, entity, max_age=None, key='value', ignored_values=[]):
+        values = self.get_all(entity, max_age=max_age, limit=1, key=key, ignored_values=ignored_values)
         if not values:
             return None
         return values[0]
 
-    def get_age(self, entity, max_age=None, key='value'):
-        value = self.get_all(entity, max_age=max_age, limit=1, key=None)
+    def get_age(self, entity, max_age=None, key='value', ignored_values=[]):
+        value = self.get_all(entity, max_age=max_age, limit=1, key=None, ignored_values=ignored_values)
         if not value:
             return (None, None)
-        return value[0][key] if key else value[0], value[0]['age'] 
+        return value[0].get(key) if key else value[0], value[0]['age'] 
 
     def get_all_first(self, entity, max_age=None, key='value'):
         values = []
@@ -95,6 +98,9 @@ class Context:
             if found_age is not None and age > found_age:
                 break
             found_age = age
+            if value in values:
+                # skip duplicates
+                continue
             values.append(value.get(key) if key else value)
         return values[::-1]
 

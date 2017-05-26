@@ -7,6 +7,7 @@ import emoji
 from .persistence import get_redis
 import pickle
 from django.conf import settings  
+from dateutil.relativedelta import relativedelta
 
 def teach_wit(wit_token, entity, values, doc=""):
     import requests
@@ -163,12 +164,21 @@ def date_this_week(tzinfo):
     today = date_today(tzinfo)
     return today - timedelta(days=today.weekday())
 
+def date_this_month(tzinfo):
+    today = date_today(tzinfo)
+    return today - timedelta(days=today.day-1)
+
 def format_date_interval(from_date, to_date, grain):
     tzinfo = from_date.tzinfo
     now = date_now(tzinfo)
     today = date_today(tzinfo)
     this_week = date_this_week(tzinfo)
     next_week = this_week + timedelta(days=7)
+    this_month = date_this_month(tzinfo)
+    next_month = date_this_month(tzinfo) + relativedelta(months=1)
+    print('This month: ', this_month)
+    print('Next month: ', next_month)
+
     diff_hours = (to_date-from_date).total_seconds() / 3600
     print('Diff hours: %s' % diff_hours)
 
@@ -197,6 +207,9 @@ def format_date_interval(from_date, to_date, grain):
 
     if from_date == next_week and to_date == next_week+timedelta(days=7):
         return 'next week'
+
+    if from_date == this_month and to_date == next_month:
+        return 'this month'
 
     if diff_hours<=25: # (25 to incorporate possible time change)
         digit = from_date.day % 10
