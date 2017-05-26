@@ -60,8 +60,12 @@ class Logger:
 
     def log_message(self, message):
         es = get_elastic()
-        if es:
+        if not es:
+            return
+        try:
             es.index(index="message-log", doc_type='message', body=message)
+        except:
+            print('Unable to log message to Elasticsearch.')
 
     def log_user(self, profile):
         user = {
@@ -69,6 +73,9 @@ class Logger:
             'profile': profile
         }
         es = get_elastic()
-        if es:
-           es.create(index="message-log", id=user['uid'], doc_type='user', body=user)
-
+        if not es:
+            return
+        try:
+            es.create(index="message-log", id=user['uid'], doc_type='user', body=user)
+        except:
+            print('Unable to log user profile to Elasticsearch.')
