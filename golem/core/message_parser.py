@@ -8,6 +8,7 @@ from .persistence import get_redis
 import pickle
 from django.conf import settings  
 from dateutil.relativedelta import relativedelta
+from django.utils import timezone
 
 def teach_wit(wit_token, entity, values, doc=""):
     import requests
@@ -89,6 +90,10 @@ def parse_text_message(text, num_tries=1):
                     else:
                         grain = value['grain']
                         date_from = dateutil.parser.parse(value['value'])
+                        if grain == 'week' and date_from == date_this_week(date_from.tzinfo):
+                            # change "this week" to next 7 days
+                            date_from = timezone.now()
+                            date_to = date_from + timedelta(days=7)
                         date_to = date_from + timedelta_from_grain(grain)
                         if 'datetime' not in append:
                             append['datetime'] = []
@@ -97,6 +102,7 @@ def parse_text_message(text, num_tries=1):
                     append['date_interval'].append({'value':(date_from, date_to), 'grain':grain, 'formatted':formatted})
                 except ValueError as e:
                     print('Error parsing date {}: {}', value, e)
+
 
     if 'datetime' in entities:
         del entities['datetime']
