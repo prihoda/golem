@@ -29,9 +29,9 @@ class Context:
             inserted[entity] = deepcopy(values)
             # prepend each value to start of the list with 0 age 
             for value in values:
-                self.dialog.log.info('Entity %s: %s' % (entity, value.get('value')))
                 value['counter'] = self.counter
                 self.entities[entity] = [value] + self.entities[entity]
+        self.debug()
         return inserted
 
     def add_state(self, state_name):
@@ -63,8 +63,9 @@ class Context:
             # if I found a too old value, stop looking
             if max_age is not None and age > max_age:
                 break
-            if value.get('value') in ignored_values:
-                self.dialog.log.info('Skipping ignored entity value: {}={}'.format(entity, value.get('value')))
+            v = value.get('value')
+            if v in ignored_values:
+                self.dialog.log.info('Skipping ignored entity value: {}={}'.format(entity, v))
                 continue
             values.append(value.get(key) if key else value.copy())
             # if I already have enough values, stop looking
@@ -72,6 +73,15 @@ class Context:
                 break
         return values 
     
+    def debug(self, max_age=5):
+        self.dialog.log.info('-- HEAD of Context (max age {}): --'.format(max_age))
+        for entity in self.entities:
+            values = self.get_all_first(entity, key=None, max_age=max_age)
+            if values:
+                vs = [value.get('value') for value in values]
+                self.dialog.log.info('{} (age {}): {}'.format(entity, values[0]['age'], vs if len(vs) > 1 else vs[0]))
+        self.dialog.log.info('----------------------------------')
+
     def get(self, entity, max_age=None, key='value', ignored_values=[]):
         values = self.get_all(entity, max_age=max_age, limit=1, key=key, ignored_values=ignored_values)
         if not values:

@@ -105,7 +105,7 @@ class DialogManager:
         self.logger.log_user_message(message_type, entities, accepted_time, accepted_state)
 
     def schedule(self, callback_name, at=None, seconds=None):
-        print('Scheduling callback "{}": at {} / seconds: {}'.format(callback_name, at, seconds))
+        self.log.info('Scheduling callback "{}": at {} / seconds: {}'.format(callback_name, at, seconds))
         if at:
             if at.tzinfo is None or at.tzinfo.utcoffset(at) is None:
                 raise Exception('Use datetime with timezone, e.g. "from django.utils import timezone"')
@@ -149,18 +149,20 @@ class DialogManager:
         return False
 
     def run_accept(self, save_identical=False):
-        self.log.info('Running ACCEPT action of {}'.format(self.current_state_name))
+        self.log.warn('Running ACCEPT action of {}'.format(self.current_state_name))
         state = self.get_state()
         if not state.accept:
+            self.log.warn('State does not have an ACCEPT action, we are done.')
             return
         response, new_state_name = state.accept(state=state)
         self.send_response(response)
         self.move_to(new_state_name, save_identical=save_identical)
 
     def run_init(self):
-        self.log.info('Running INIT action of {}'.format(self.current_state_name))
+        self.log.warn('Running INIT action of {}'.format(self.current_state_name))
         state = self.get_state()
         if not state.init:
+            self.log.warn('State does not have an INIT action, we are done.')
             return
         response, new_state_name = state.init(state=state)
         self.send_response(response)
@@ -191,7 +193,7 @@ class DialogManager:
                     break
 
         if not new_state_name:
-            print('Error! Found intent "%s" but no flow present for it!' % intent)
+            self.log.error('Error! Found intent "%s" but no flow present for it!' % intent)
             return False
 
         new_state_name = new_state_name+':accept'

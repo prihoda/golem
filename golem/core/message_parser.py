@@ -9,6 +9,7 @@ import pickle
 from django.conf import settings  
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
+import json
 
 def teach_wit(wit_token, entity, values, doc=""):
     import requests
@@ -71,6 +72,13 @@ def parse_text_message(text, num_tries=1):
     print('WIT ENTITIES:', entities)
     append = parse_additional_entities(text)
     for entity,values in entities.items():
+
+        for value in values:
+            # parse string metadata from Wit into a dict
+            metadata = value.get('metadata')
+            if metadata and isinstance(metadata, str):
+                value['metadata'] = json.loads(metadata)
+
         # parse datetimes to date_intervals
         if entity == 'datetime':
             '''
@@ -102,7 +110,6 @@ def parse_text_message(text, num_tries=1):
                     append['date_interval'].append({'value':(date_from, date_to), 'grain':grain, 'formatted':formatted})
                 except ValueError as e:
                     print('Error parsing date {}: {}', value, e)
-
 
     if 'datetime' in entities:
         del entities['datetime']
