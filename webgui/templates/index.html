@@ -1,0 +1,175 @@
+<h1>Messages for user {{ uid }}</h1>
+<div id="list_wrap">
+    <div id="list">
+        {% for m in messages %}
+        <div class="msg" style="text-align: {% if m.is_response %} left {% else %} right {% endif %}">
+            <span class="time">[{{ m.get_time }}]</span><span class="text">{{ m.text }}</span>
+            <div class="msg_elements">
+                {% for e in m.get_elements %}
+                    <div class="element">
+                        <h3 class="element_txt">{{ e.title }}</h3>
+                        <!--<h4 class="element_txt">{{ e.subtitle }}</h4>-->
+                        <img class="element_img" src="{{ e.image_url }}"/>
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="msg_buttons">
+            {% for b in m.get_buttons %}
+                {% if b.action == 'link' %}
+                    <button class="msg_btn" onclick="gourl('{{ b.url }}')">{{ b.text }}</button>
+                {% elif b.action == 'reply' %}
+                    <button class="msg_btn" onclick="quickreply('{{ b.text }}')">{{ b.text }}</button>
+                {% endif %}
+            {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<form id="form_msg">
+    {% csrf_token %}
+    {{ form }}
+    <input type="submit" value="Send">
+</form>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+
+<script type="text/javascript">
+    function quickreply(text) {
+        $.ajax({
+                url: document.URL,
+                type: 'POST',
+                dataType: 'json',
+                data: {
+                    message: text,
+                    csrfmiddlewaretoken: document.getElementsByName('csrfmiddlewaretoken')[0].value
+                }
+            });
+    }
+    function gourl(url) {
+        window.open(url, '_blank');
+    }
+</script>
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        $('#form_msg').submit(function (e) {
+            e.preventDefault();
+            var txt = $('#id_message');
+            $.ajax({
+                url: document.URL,
+                type: 'POST',
+                dataType: 'json',
+                data: {
+                    message: txt.val(),
+                    csrfmiddlewaretoken: document.getElementsByName('csrfmiddlewaretoken')[0].value
+                }
+            });
+            txt.val("")
+        })
+    });
+</script>
+
+<script type="text/javascript">
+    $(window).load(function() {
+        setTimeout(refresh, 2000);
+    });
+
+    function refresh() {
+        setTimeout(refresh, 2000);
+        $('#list').load(document.URL + ' #list');
+        // TODO redraw only when response differs
+    }
+</script>
+<style>
+    @import url('https://fonts.googleapis.com/css?family=Roboto');
+
+    body {
+        background-color: #eeeeee;
+    }
+
+    h1 {
+        font-family: "Roboto", sans-serif;
+        text-align: center;
+        background-color: #2196F3;
+        color: white;
+        padding: 32px;
+        padding-right: 45%;
+        box-shadow: 0 4px 12px #777777;
+        font-weight: 500;
+        z-index: 10;
+    }
+    #list_wrap {
+        background-color: #ffffff;
+        width: 80%;
+        margin: auto;
+        margin-bottom: 10%;
+        padding: 20px;
+        height: 100%;
+    }
+
+
+    .msg {
+        font-family: "Roboto", sans-serif;
+        font-weight: 400;
+    {#        border-bottom: 1px #dddddd solid;#}
+        padding: 2px;
+        margin-bottom: 10px;
+    }
+
+    .time {
+        color: #8c8c8c;
+        font-weight: 400;
+        font-size: small;
+        clear: both;
+        display: block;
+    }
+
+    #form_msg {
+        position: fixed;
+        clear: both;
+        bottom: 8px;
+        right: 0;
+        margin-right: 10%;
+        font-family: Roboto, sans-serif;
+    }
+
+    .element {
+        height: 150px;
+        width: 200px;
+        position: relative;
+        overflow: visible;
+        background: #ececec;
+        border: solid 2px #dddddd;
+        margin: 5px;
+    }
+
+    .element_img {
+        position: absolute;
+        width: auto;
+        height:70%;
+        left: 0;
+        top: 0;
+    }
+
+    .element_txt {
+        z-index: 100;
+        color: #555;
+        position: relative;
+        font-weight: 400;
+        left:0;
+        top: 70%;
+        width: auto;
+        height: 30%;
+    }
+
+    .msg_elements {
+        width: 100%;
+        display: inline-flex;
+        height: auto;
+        margin-right: auto;
+        margin-left: auto;
+    }
+
+</style>
