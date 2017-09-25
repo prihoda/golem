@@ -1,5 +1,8 @@
 import time
+
 from copy import deepcopy
+
+
 # import sys
 # import traceback
 
@@ -45,13 +48,18 @@ class Context:
         }
         self.history.append(state)
 
+    def clear(self, entities):
+        for entity in entities:
+            if entity in self.entities:
+                del self.entities[entity]
+
     def get_min_entity_age(self, entities):
         ages = [self.get_age(entity)[1] for entity in entities]
         ages = filter(lambda x: x is not None, ages)
         return min(ages) if ages else None
 
     def get_history_state(self, index):
-        return self.history[index] if len(self.history) >= abs(index) else None
+        return self.history[index] if len(self.history) > abs(index) else None
 
     def get_all(self, entity, max_age=None, limit=None, key='value', ignored_values=[]):
         values = []
@@ -124,11 +132,24 @@ class Context:
         value_dict['counter'] = self.counter
         self.entities[entity] = [value_dict] + self.entities[entity][:self.max_depth-1]
 
+    def set_value(self, entity, value):
+        if entity not in self.entities:
+            self.entities[entity] = []
+        value_dict = {'counter': self.counter, 'value': value}
+        self.entities[entity] = [value_dict] + self.entities[entity][:self.max_depth-1]
+
     def has_any(self, entities, max_age=None):
         for entity in entities:
             if self.get(entity, max_age=max_age, key=None):
                 return True
         return False
+
+    def has_all(self, entities, max_age=None):
+        for entity in entities:
+            if not self.get(entity, max_age=max_age, key=None):
+                return False
+        return True
+
     #def entity_value(self, entity):
     #    values = self.entity_values(entity)
     #    return values[0] if values else None

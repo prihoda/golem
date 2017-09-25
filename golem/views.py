@@ -1,16 +1,22 @@
-from django.http.response import HttpResponse, JsonResponse
-from django.template import loader
-from golem.core.persistence import get_redis,get_elastic
-from golem.core.tests import ConversationTest, ConversationTestRecorder, ConversationTestException, TestLog, UserTextMessage
 import json
+import logging
 import time
 import traceback
+
+from django.conf import settings
+from django.http.response import HttpResponse, JsonResponse
+from django.template import loader
 from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
 from django.views import generic
-from django.conf import settings  
-from golem.core.interfaces.telegram import TelegramInterface
+from django.views.decorators.csrf import csrf_exempt
+
 from golem.core.interfaces.facebook import FacebookInterface
+from golem.core.interfaces.gactions import GActionsInterface
+from golem.core.interfaces.telegram import TelegramInterface
+from golem.core.persistence import get_elastic
+from golem.core.tests import ConversationTest, ConversationTestRecorder, ConversationTestException, TestLog, \
+    UserTextMessage
+
 
 class FacebookView(generic.View):
 
@@ -51,6 +57,20 @@ class TelegramView(generic.View):
         TelegramInterface.accept_request(request_body)
         return HttpResponse()
 
+
+class GActionsView(generic.View):
+    def get(self, request, *args, **kwargs):
+        return HttpResponse()
+
+    @method_decorator(csrf_exempt)
+    def dispatch(self, request, *args, **kwargs):
+        return generic.View.dispatch(self, request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        body = json.loads(self.request.body.decode('utf-8'))
+        logging.critical(body)
+        GActionsInterface.accept_request(body)
+        return HttpResponse()
 
 
 def test(request):

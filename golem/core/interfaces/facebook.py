@@ -1,15 +1,22 @@
-import json
-import requests
-from golem.core.message_parser import parse_text_message
-from golem.core.serialize import json_serialize,json_deserialize
 import datetime
-from golem.core.responses import *
+import logging
+
+import requests
+from django.conf import settings
+
+from golem.core.message_parser import parse_text_message
 from golem.core.persistence import get_redis
-from django.conf import settings  
+from golem.core.responses.buttons import *
+from golem.core.responses.quick_reply import QuickReply
+from golem.core.responses.responses import *
+from golem.core.responses.templates import ListTemplate
+from golem.core.serialize import json_deserialize
 from golem.tasks import accept_user_message
+
 
 class FacebookInterface():
     name = 'facebook'
+    prefix = 'fb'
     TEXT_LENGTH_LIMIT = 320
 
     # Post function to handle Facebook messages
@@ -29,7 +36,9 @@ class FacebookInterface():
                     # Confirm accepted message
                     FacebookInterface.post_message(uid, SenderActionMessage('mark_seen'))
                     # Add it to the message queue
+                    print('Adding message to queue')
                     accept_user_message.delay('facebook', uid, raw_message)
+                    #print('1 + 1 = ', test_add.delay(1, 1))
                 elif raw_message.get('timestamp'):
                     print("Delay {} too big, ignoring message!".format(diff))
                     print(raw_message)
@@ -48,7 +57,7 @@ class FacebookInterface():
         if not cache or not db.exists(key):
             print('Loading fb profile...')
 
-            url = "https://graph.facebook.com/v2.6/"+fbid
+            url = "https://graph.facebook.com/v2.6/" + fbid
             params = {
                 'fields': 'first_name,last_name,profile_pic,locale,timezone,gender',
                 'access_token': settings.GOLEM_CONFIG.get('FB_PAGE_TOKEN')
@@ -64,12 +73,11 @@ class FacebookInterface():
 
     @staticmethod
     def fbid_to_uid(fbid):
-         return 'fb_'+fbid
+         return 'fb_{}'.format(fbid)
 
     @staticmethod
     def post_message(uid, response):
 
-        # print(payload, type_)
         if isinstance(response, SenderActionMessage):
             request_mode = "messages"
             fbid = FacebookInterface.uid_to_fbid(uid)
@@ -87,16 +95,18 @@ class FacebookInterface():
             raise ValueError('Error: Invalid message type: {}: {}'.format(type(response), response))
 
         prefix_post_message_url = 'https://graph.facebook.com/v2.6/me/'
-        token = settings.GOLEM_CONFIG.get('FB_PAGE_TOKEN')
-        post_message_url = prefix_post_message_url+request_mode+'?access_token='+token
-        # print("POST", post_message_url)
+        token = settings.GOLEM_CONFIG['FB_PAGE_TOKEN']
+        if token is None:
+            raise ValueError('Token is null!')
+        post_message_url = prefix_post_message_url + request_mode + '?access_token=' + token
+
         r = requests.post(post_message_url,
                                headers={"Content-Type": "application/json"},
                                data=json.dumps(response_dict, default=json_serialize))
         if r.status_code != 200:
-            print('ERROR: MESSAGE REFUSED: ', response_dict)
-            print('ERROR: ', r.text)
-            raise Exception(r.json()['error']['message'])
+            logging.error('ERROR: MESSAGE REFUSED: {}'.format(response_dict))
+            logging.error('ERROR: {}'.format(r.text))
+            logging.exception(r.json()['error']['message'])
 
     @staticmethod
     def to_setting(response):
@@ -181,29 +191,13 @@ class FacebookInterface():
             return message
 
         elif isinstance(response, QuickReply):
-            message = {
-                "content_type": response.content_type
-            }
-            if response.content_type=='text':
-                message['title'] = response.title[:20]
-                message['payload'] = json.dumps(response.payload if response.payload else {}, default=json_serialize)
-            return message
+            return response.to_response()
 
         elif isinstance(response, Button):
-            message = {"title": response.title}
-            if response.payload:
-                message['type'] = 'postback'
-                if not response.payload: response.payload = {}
-                response.payload['_log_text'] = response.title
-                message['payload'] = json.dumps(response.payload, default=json_serialize)
-            if response.url:
-                message['type'] = 'web_url'
-                message['url'] = response.url
-            if response.phone_number:
-                message['type'] = 'phone_number'
-                message['payload'] = response.url
-                message['webview_height_ratio'] = response.webview_height_ratio
-            return message
+            return response.to_response()
+
+        elif isinstance(response, ListTemplate):
+            return response.to_response()
 
         raise ValueError('Error: Invalid message type: {}: {}'.format(type(response), response))
 
@@ -264,7 +258,8 @@ class FacebookInterface():
         for attachment in attachments:
             if 'coordinates' in attachment['payload']:
                 coordinates = attachment['payload']['coordinates']
-                entities['current_location'].append({'value':attachment['title'], 'name':attachment['title'], 'coordinates':coordinates})
+                entities['current_location'].append({'value':attachment['title'], 'name':attachment['title'],
+                                                     'coordinates':coordinates, 'timestamp': datetime.datetime.now()})
             if 'url' in attachment['payload']:
                 url = attachment['payload']['url']
                 # TODO: add attachment type by extension

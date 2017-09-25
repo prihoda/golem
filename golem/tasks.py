@@ -1,11 +1,13 @@
-from celery import shared_task
-from celery.utils.log import get_task_logger
+import time
 import traceback
+
+from celery import shared_task
+from celery.task.schedules import crontab
+from celery.utils.log import get_task_logger
+from django.conf import settings
+
 from golem.core.interfaces.all import create_from_name
 from golem.core.persistence import get_redis
-from celery.task.schedules import crontab
-from django.conf import settings
-import time
 
 logger = get_task_logger(__name__)
 
@@ -32,7 +34,7 @@ def setup_schedule_callbacks(sender, callback):
             cron = params
         else:
             raise Exception('Specify either number of seconds or dict of celery crontab params (hour, minute): {}'.format(params))
-        sender.add_periodic_task(   
+        sender.add_periodic_task(
             cron,
             callback.s(name),
         )

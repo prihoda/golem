@@ -1,11 +1,14 @@
-from .message_parser import parse_text_message
-from .interfaces.test import TestInterface
-from .serialize import json_serialize, json_deserialize
-from golem.core.responses import *
-from golem.core.persistence import get_redis
 import json
 import time
-from django.conf import settings  
+
+from django.conf import settings
+
+from golem.core.persistence import get_redis
+from golem.core.responses.responses import *
+from .interfaces.test import TestInterface
+from .message_parser import parse_text_message
+from .serialize import json_deserialize
+
 
 class ConversationTestException(Exception):
     def __init__(self, message):

@@ -1,17 +1,20 @@
-from .context import Context
-from .serialize import json_deserialize,json_serialize
-from .persistence import get_redis
-from .responses import MessageElement
-from .tests import ConversationTestRecorder
-from .flow import Flow
-from .responses import *
 import json
-import re
-import importlib, logging
+import logging
 import time
-from django.conf import settings  
-from .logger import Logger
+
+import importlib
+import re
+from django.conf import settings
+
+from golem.core.responses.responses import TextMessage
 from golem.tasks import accept_inactivity_callback, accept_schedule_callback
+from .context import Context
+from .flow import Flow
+from .logger import Logger
+from .persistence import get_redis
+from .serialize import json_deserialize, json_serialize
+from .tests import ConversationTestRecorder
+
 
 class DialogManager:
     version = '1.28'
@@ -23,7 +26,7 @@ class DialogManager:
         self.profile = interface.load_profile(uid)
         self.db = get_redis()
         self.log = logging.getLogger()
-            
+        
         entities = {}
         version = self.db.get('dialog_version')
         self.log.info('Initializing dialog for user %s...' % uid)
@@ -57,7 +60,7 @@ class DialogManager:
         self.current_state_name = 'default.root'
 
     def create_flows(self):
-        flow = {}  
+        flow = {}
         BOTS = settings.GOLEM_CONFIG.get('BOTS')
         for module_name in BOTS:
             module = importlib.import_module(module_name)
@@ -149,20 +152,20 @@ class DialogManager:
         return False
 
     def run_accept(self, save_identical=False):
-        self.log.warn('Running ACCEPT action of {}'.format(self.current_state_name))
+        self.log.warning('Running ACCEPT action of {}'.format(self.current_state_name))
         state = self.get_state()
         if not state.accept:
-            self.log.warn('State does not have an ACCEPT action, we are done.')
+            self.log.warning('State does not have an ACCEPT action, we are done.')
             return
         response, new_state_name = state.accept(state=state)
         self.send_response(response)
         self.move_to(new_state_name, save_identical=save_identical)
 
     def run_init(self):
-        self.log.warn('Running INIT action of {}'.format(self.current_state_name))
+        self.log.warning('Running INIT action of {}'.format(self.current_state_name))
         state = self.get_state()
         if not state.init:
-            self.log.warn('State does not have an INIT action, we are done.')
+            self.log.warning('State does not have an INIT action, we are done.')
             return
         response, new_state_name = state.init(state=state)
         self.send_response(response)
@@ -186,7 +189,7 @@ class DialogManager:
                     new_state_name = state.name
                     break
         # Check accepted intent of all flows
-        if not new_state_name:                
+        if not new_state_name:
             for flow in self.flows.values():
                 if re.match(flow.intent, intent):
                     new_state_name = flow.name+'.root'
@@ -242,10 +245,25 @@ class DialogManager:
             if self.recording:
                 ConversationTestRecorder.record_state_change(self.current_state_name)
 
-            if action=='init':
-                self.run_init()
-            elif action=='accept':
-                self.run_accept()
+            try:
+
+                if action == 'init':
+                    self.run_init()
+                elif action == 'accept':
+                    self.run_accept()
+
+            except Exception as e:
+                logging.error('*****************************************************')
+                logging.error('Exception occurred while running action {} of state {}'
+                              .format(action, new_state_name))
+                logging.error('Uid: {}'.format(self.uid))
+                try:
+                    context_debug = self.get_state().dialog.context.debug()
+                    logging.error('Context: {}'.format(context_debug))
+                except:
+                    pass
+                logging.exception('Exception follows')
+                self.send_response([TextMessage('Internal error :-(((')])
 
         self.save_state()
         return True
@@ -285,4 +303,3 @@ class DialogManager:
             # Log the response
             self.log.info('Message: {}'.format(response))
             self.logger.log_bot_message(response, self.current_state_name)
-
