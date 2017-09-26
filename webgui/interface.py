@@ -26,7 +26,7 @@ class WebGuiInterface:
 
     @staticmethod
     def post_message(uid, response):
-        uid = uid.split('_')[1]
+        uid = uid.split('_', 1)[1]
         WebGuiInterface.messages.append(response)
         message = Message()
         message.uid = uid
@@ -104,7 +104,7 @@ class WebGuiInterface:
         # delete messages for old session with this uid, if there was one
         try:
             Message.objects.get(uid__exact=uid).delete()
-        except OperationalError:
+        except Exception:
             pass  # first user, there is no such table yet
         return uid
 
