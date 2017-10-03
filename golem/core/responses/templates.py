@@ -5,11 +5,6 @@ from golem.core.responses.responses import MessageElement, GenericTemplateElemen
 
 class ListTemplate(MessageElement):
 
-    """
-    Vertical list template with 2-4 items.
-    See messenger documentation.
-    """
-
     def __init__(self, is_compact=False, button=None):
         super().__init__()
         self.elements = []  # type: List[GenericTemplateElement]

@@ -12,11 +12,17 @@ from golem.core.persistence import get_redis
 logger = get_task_logger(__name__)
 
 @shared_task
-def accept_user_message(interface_name, uid, raw_message):
+def accept_user_message(interface_name, uid, raw_message, chat_id=None):
     from golem.core.dialog_manager import DialogManager
-    print("Accepting message from {}: {}".format(uid, raw_message))
+    print("Accepting message, uid {}, chat_id {}, message: {}".format(uid, chat_id, raw_message))
     interface = create_from_name(interface_name)
-    dialog = DialogManager(uid=uid, interface=interface)
+    prefixed_uid = interface.prefix + '_' + uid
+    if chat_id:
+        prefixed_chat_id = interface.prefix + '_' + chat_id
+    else:
+        prefixed_chat_id = None
+
+    dialog = DialogManager(uid=prefixed_uid, chat_id=prefixed_chat_id, interface=interface)
     parsed = interface.parse_message(raw_message)
     _process_message(dialog, parsed)
 
@@ -49,7 +55,7 @@ def accept_schedule_all_users(callback_name):
         accept_schedule_callback(interface_name, uid.decode('utf-8'), callback_name)
 
 @shared_task
-def accept_schedule_callback(interface_name, uid, callback_name):
+def accept_schedule_callback(interface_name, uid, callback_name, chat_id=None):
     from golem.core.dialog_manager import DialogManager
     db = get_redis()
     active_time = float(db.hget('session_active', uid).decode('utf-8'))
@@ -64,14 +70,14 @@ def accept_schedule_callback(interface_name, uid, callback_name):
             '_callback_name' : callback_name
         }
     }
-    dialog = DialogManager(uid=uid, interface=interface)
+    dialog = DialogManager(uid=uid, interface=interface, chat_id=chat_id)
     _process_message(dialog, parsed)
 
 @shared_task
-def accept_inactivity_callback(interface_name, uid, context_counter, callback_name, inactive_seconds):
+def accept_inactivity_callback(interface_name, uid, chat_id, context_counter, callback_name, inactive_seconds):
     from golem.core.dialog_manager import DialogManager
     interface = create_from_name(interface_name)
-    dialog = DialogManager(uid=uid, interface=interface)
+    dialog = DialogManager(uid=uid, chat_id=chat_id, interface=interface)
 
     # User has sent a message, cancel inactivity callback
     if dialog.context.counter != context_counter:

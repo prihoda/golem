@@ -3,32 +3,37 @@ import logging
 interfaces = []
 
 
-def add_interface(interface):
+def register_chat_interface(interface):
     """
-    You can add your own chat interface for a chat platform here.
-    :param interface: See telegram.py for an example.
+    Registers a chat interface.
+    :param interface: Class of the interface to register.
+                      See golem.core.interfaces for reference.
     """
     interfaces.append(interface)
 
 
 def get_interfaces():
+    """
+    :returns: List of all registered chat interface classes.
+    """
     from golem.core.interfaces.facebook import FacebookInterface
     from golem.core.interfaces.telegram import TelegramInterface
+    from golem.core.interfaces.microsoft import MicrosoftInterface
     from golem.core.interfaces.test import TestInterface
-    return interfaces + [FacebookInterface, TelegramInterface, TestInterface]
+    return interfaces + [FacebookInterface, TelegramInterface, MicrosoftInterface, TestInterface]
 
 
 def create_from_name(name):
-    from golem.core.interfaces.facebook import FacebookInterface
-    from golem.core.interfaces.telegram import TelegramInterface
-    from golem.core.interfaces.test import TestInterface
-    ifs = interfaces + [FacebookInterface, TelegramInterface, TestInterface]
+    ifs = get_interfaces()
     for interface in ifs:
         if interface.name == name:
             return interface
 
 
 def init_webhooks():
+    """
+    Registers webhooks for telegram messages.
+    """
     logging.debug('Trying to register telegram webhook')
     try:
         from golem.core.interfaces.telegram import TelegramInterface

@@ -52,12 +52,11 @@ class TelegramInterface():
         return {'first_name': 'Tests', 'last_name': ''}
 
     @staticmethod
-    def post_message(uid, response):
+    def post_message(uid, chat_id, response):
         from golem.core.responses.adapter import TelegramAdapter
         base_url = TelegramInterface.get_base_url()
         if not base_url:
             return
-        chat_id = TelegramInterface.uid_to_chat_id(uid)
         adapter = TelegramAdapter(chat_id)
         messages = adapter.to_response(response)
         for method, payload in messages:
@@ -97,13 +96,13 @@ class TelegramInterface():
         pass
 
     @staticmethod
-    def processing_start(uid):
+    def processing_start(uid, chat_id):
         base_url = TelegramInterface.get_base_url()
         if not base_url:
             return
         url = base_url + 'sendChatAction'
         payload = {
-            'chat_id': TelegramInterface.uid_to_chat_id(uid),
+            'chat_id': chat_id,
             'action': 'typing'
         }
         response = requests.post(url, data=payload)
@@ -111,22 +110,12 @@ class TelegramInterface():
             logging.warning(response.json())
 
     @staticmethod
-    def processing_end(uid):
+    def processing_end(uid, chat_id):
         pass
 
     @staticmethod
     def state_change(state):
         pass
-
-    @staticmethod
-    def chat_id_to_uid(chat: dict) -> Optional[str]:
-        if not (chat and ('id' in chat)):
-            return None
-        return TelegramInterface.prefix + '_' + str(chat['id'])
-
-    @staticmethod
-    def uid_to_chat_id(uid: str) -> str:
-        return str(uid).split('_', maxsplit=1)[1]
 
     @staticmethod
     def has_message_expired(message: dict) -> bool:
@@ -150,10 +139,11 @@ class TelegramInterface():
         if 'message' in body:
             message = body['message']
 
-            uid = TelegramInterface.chat_id_to_uid(message['chat'])
+            chat_id = message['chat']['id']
+            uid = message['from']['id'] if 'from' in message else None  # null for group chats
             if uid and not TelegramInterface.has_message_expired(message):
                 logging.debug('Adding message to queue')
-                accept_user_message.delay(TelegramInterface.name, uid, body)
+                accept_user_message.delay(TelegramInterface.name, uid, body, chat_id=chat_id)
                 return True
             else:
                 logging.warning('No sender specified, ignoring message')
@@ -170,8 +160,9 @@ class TelegramInterface():
                 logging.error('No message in callback query, probably too old, ignoring.')
             if 'message' in callback_query:
                 # unfortunately, there is no way to check the age of callback itself
-                uid = TelegramInterface.chat_id_to_uid(callback_query['message']['chat'])
-                accept_user_message.delay(TelegramInterface.name, uid, body)
+                chat_id = callback_query['message']['chat']['id']
+                uid = message['from']['id'] if 'from' in message else None
+                accept_user_message.delay(TelegramInterface.name, uid, body, chat_id=chat_id)
                 return True
         else:
             logging.warning('Unknown message type')

@@ -32,9 +32,9 @@ class FacebookInterface():
                 if diff.total_seconds() < settings.GOLEM_CONFIG.get('MSG_LIMIT_SECONDS'):
                     # print("MSG FB layer GET FB:")
                     print('INCOMING RAW FB MESSAGE: {}'.format(raw_message))
-                    uid = FacebookInterface.fbid_to_uid(raw_message['sender']['id'])
+                    uid = raw_message['sender']['id']
                     # Confirm accepted message
-                    FacebookInterface.post_message(uid, SenderActionMessage('mark_seen'))
+                    FacebookInterface.post_message(uid, uid, SenderActionMessage('mark_seen'))
                     # Add it to the message queue
                     print('Adding message to queue')
                     accept_user_message.delay('facebook', uid, raw_message)
@@ -44,20 +44,15 @@ class FacebookInterface():
                     print(raw_message)
 
     @staticmethod
-    def uid_to_fbid(uid):
-        return uid.split('_',maxsplit=1)[1] # uid has format fb_{number}
-
-    @staticmethod
     def load_profile(uid, cache=True):
-        fbid = FacebookInterface.uid_to_fbid(uid)
 
         db = get_redis()
-        key = 'fb_profile_'+fbid
+        key = 'fb_profile_' + uid
 
         if not cache or not db.exists(key):
             print('Loading fb profile...')
 
-            url = "https://graph.facebook.com/v2.6/" + fbid
+            url = "https://graph.facebook.com/v2.6/" + uid
             params = {
                 'fields': 'first_name,last_name,profile_pic,locale,timezone,gender',
                 'access_token': settings.GOLEM_CONFIG.get('FB_PAGE_TOKEN')
@@ -71,21 +66,16 @@ class FacebookInterface():
 
         return json.loads(db.get(key).decode('utf-8'))
 
-    @staticmethod
-    def fbid_to_uid(fbid):
-         return 'fb_{}'.format(fbid)
 
     @staticmethod
-    def post_message(uid, response):
+    def post_message(uid, chat_id, response):
 
         if isinstance(response, SenderActionMessage):
             request_mode = "messages"
-            fbid = FacebookInterface.uid_to_fbid(uid)
-            response_dict = {'sender_action':response.action, 'recipient':{"id": fbid}}
+            response_dict = {'sender_action': response.action, 'recipient': {"id": uid}}
         elif isinstance(response, MessageElement):
             message = FacebookInterface.to_message(response)
-            fbid = FacebookInterface.uid_to_fbid(uid)
-            response_dict = {"recipient": {"id": fbid}, "message": message}
+            response_dict = {"recipient": {"id": uid}, "message": message}
             request_mode = "messages"
         elif isinstance(response, ThreadSetting):
             request_mode = "thread_settings"
@@ -96,7 +86,7 @@ class FacebookInterface():
 
         prefix_post_message_url = 'https://graph.facebook.com/v2.6/me/'
         token = settings.GOLEM_CONFIG['FB_PAGE_TOKEN']
-        if token is None:
+        if token is None:  # TODO modified here
             raise ValueError('Token is null!')
         post_message_url = prefix_post_message_url + request_mode + '?access_token=' + token
 
@@ -204,15 +194,15 @@ class FacebookInterface():
     @staticmethod
     def send_settings(settings):
         for setting in settings:
-            FacebookInterface.post_message(None, setting)
+            FacebookInterface.post_message(None, None, setting)
 
     @staticmethod
-    def processing_start(uid):
+    def processing_start(uid, chat_id):
         # Show typing animation
-        FacebookInterface.post_message(uid, SenderActionMessage('typing_on'))
+        FacebookInterface.post_message(uid, uid, SenderActionMessage('typing_on'))
 
     @staticmethod
-    def processing_end(uid):
+    def processing_end(uid, chat_id):
         pass
 
     @staticmethod

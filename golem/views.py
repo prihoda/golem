@@ -12,6 +12,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from golem.core.interfaces.facebook import FacebookInterface
 from golem.core.interfaces.gactions import GActionsInterface
+from golem.core.interfaces.microsoft import MicrosoftInterface
 from golem.core.interfaces.telegram import TelegramInterface
 from golem.core.persistence import get_elastic
 from golem.core.tests import ConversationTest, ConversationTestRecorder, ConversationTestException, TestLog, \
@@ -73,6 +74,22 @@ class GActionsView(generic.View):
         return HttpResponse()
 
 
+class SkypeView(generic.View):
+    def get(self, request, *args, **kwargs):
+        body = json.loads(self.request.body.decode('utf-8'))
+        MicrosoftInterface.accept_request(body)
+        return HttpResponse()
+
+    def post(self, request, *args, **kwargs):
+        body = json.loads(self.request.body.decode('utf-8'))
+        MicrosoftInterface.accept_request(body)
+        return HttpResponse()
+
+    @method_decorator(csrf_exempt)
+    def dispatch(self, request, *args, **kwargs):
+        return generic.View.dispatch(self, request, *args, **kwargs)
+
+
 def test(request):
 
     with open('test/results.json') as infile:
@@ -104,10 +121,9 @@ def test(request):
 
 def run_test(request, name):
     import importlib
-    import imp
 
     module = importlib.import_module('test.tests.'+name)
-    imp.reload(module)
+    importlib.reload(module)
     return _run_test_actions(module.actions)
 
 def run_test_message(request, message):

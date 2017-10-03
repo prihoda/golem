@@ -17,13 +17,14 @@ from .tests import ConversationTestRecorder
 
 
 class DialogManager:
-    version = '1.28'
+    version = '1.29'
 
-    def __init__(self, uid, interface):
-        self.uid = uid
+    def __init__(self, uid, interface, chat_id=None):
+        self.uid = str(uid)
+        self.chat_id = str(chat_id) if chat_id else str(uid)
         self.interface = interface
         self.logger = Logger(uid=uid, interface=interface)
-        self.profile = interface.load_profile(uid)
+        self.profile = interface.load_profile(local_id(uid))
         self.db = get_redis()
         self.log = logging.getLogger()
         
@@ -32,12 +33,13 @@ class DialogManager:
         self.log.info('Initializing dialog for user %s...' % uid)
         self.current_state_name = None
         self.context = None
-        if version and version.decode('utf-8')==DialogManager.version and self.db.hexists('session_entities', self.uid):
-            entities_string = self.db.hget('session_entities', self.uid)
-            history_string = self.db.hget('session_history', self.uid)
+        if version and version.decode('utf-8') == DialogManager.version and self.db.hexists('session_entities',
+                                                                                            self.chat_id):
+            entities_string = self.db.hget('session_entities', self.chat_id)
+            history_string = self.db.hget('session_history', self.chat_id)
             self.init_flows()
-            state = self.db.hget('session_state', self.uid).decode('utf-8')
-            counter = int(self.db.hget('session_counter', self.uid))
+            state = self.db.hget('session_state', self.chat_id).decode('utf-8')
+            counter = int(self.db.hget('session_counter', self.chat_id))
             self.log.info('Session exists at state %s' % (state))
             self.move_to(state, initializing=True)
             #self.log.info(entities_string)
@@ -68,13 +70,13 @@ class DialogManager:
         return flow
 
     @staticmethod
-    def clear_uid(uid):
+    def clear_chat(chat_id):
         db = get_redis()
-        db.hdel('session_state', uid)
-        db.hdel('session_entities', uid)
+        db.hdel('session_state', chat_id)
+        db.hdel('session_entities', chat_id)
 
     def process(self, message_type, entities):
-        self.interface.processing_start(self.uid)
+        self.interface.processing_start(local_id(self.uid), local_id(self.chat_id))
         accepted_time = time.time()
         accepted_state = self.current_state_name
         # Only process messages and postbacks (not 'seen_by's, etc)
@@ -102,7 +104,7 @@ class DialogManager:
                 self.run_accept(save_identical=True)
                 self.save_state()
 
-        self.interface.processing_end(self.uid)
+        self.interface.processing_end(local_id(self.uid), local_id(self.chat_id))
 
         # leave logging message to the end so that the user does not wait
         self.logger.log_user_message(message_type, entities, accepted_time, accepted_state)
@@ -112,18 +114,20 @@ class DialogManager:
         if at:
             if at.tzinfo is None or at.tzinfo.utcoffset(at) is None:
                 raise Exception('Use datetime with timezone, e.g. "from django.utils import timezone"')
-            accept_schedule_callback.apply_async((self.interface.name, self.uid, callback_name), eta=at)
+            accept_schedule_callback.apply_async((self.interface.name, self.chat_id, callback_name), eta=at)
         elif seconds:
-            accept_schedule_callback.apply_async((self.interface.name, self.uid, callback_name), countdown=seconds)
+            accept_schedule_callback.apply_async((self.interface.name, self.chat_id, callback_name), countdown=seconds)
         else:
             raise Exception('Specify either "at" or "seconds" parameter')
 
     def inactive(self, callback_name, seconds):
         self.log.info('Setting inactivity callback "{}" after {} seconds'.format(callback_name, seconds))
-        accept_inactivity_callback.apply_async((self.interface.name, self.uid, self.context.counter, callback_name, seconds), countdown=seconds)
+        accept_inactivity_callback.apply_async(
+            (self.interface.name, self.uid, self.chat_id, self.context.counter, callback_name, seconds),
+            countdown=seconds)
 
     def save_inactivity_callback(self):
-        self.db.hset('session_active', self.uid, time.time())
+        self.db.hset('session_active', self.chat_id, time.time())
         callbacks = settings.GOLEM_CONFIG.get('INACTIVE_CALLBACKS')
         if not callbacks:
             return
@@ -152,10 +156,10 @@ class DialogManager:
         return False
 
     def run_accept(self, save_identical=False):
-        self.log.warning('Running ACCEPT action of {}'.format(self.current_state_name))
+        self.log.warn('Running ACCEPT action of {}'.format(self.current_state_name))
         state = self.get_state()
         if not state.accept:
-            self.log.warning('State does not have an ACCEPT action, we are done.')
+            self.log.warn('State does not have an ACCEPT action, we are done.')
             return
         response, new_state_name = state.accept(state=state)
         self.send_response(response)
@@ -256,7 +260,7 @@ class DialogManager:
                 logging.error('*****************************************************')
                 logging.error('Exception occurred while running action {} of state {}'
                               .format(action, new_state_name))
-                logging.error('Uid: {}'.format(self.uid))
+                logging.error('Uid: {}, Chat id: {}'.format(self.uid, self.chat_id))
                 try:
                     context_debug = self.get_state().dialog.context.debug()
                     logging.error('Context: {}'.format(context_debug))
@@ -272,11 +276,11 @@ class DialogManager:
         if not self.context:
             return
         self.log.info('Saving state at %s' % (self.current_state_name))
-        self.db.hset('session_state', self.uid, self.current_state_name)
-        self.db.hset('session_history', self.uid, json.dumps(self.context.history, default=json_serialize))
-        self.db.hset('session_entities', self.uid, json.dumps(self.context.entities, default=json_serialize))
-        self.db.hset('session_counter', self.uid, self.context.counter)
-        self.db.hset('session_interface', self.uid, self.interface.name)
+        self.db.hset('session_state', self.chat_id, self.current_state_name)
+        self.db.hset('session_history', self.chat_id, json.dumps(self.context.history, default=json_serialize))
+        self.db.hset('session_entities', self.chat_id, json.dumps(self.context.entities, default=json_serialize))
+        self.db.hset('session_counter', self.chat_id, self.context.counter)
+        self.db.hset('session_interface', self.chat_id, self.interface.name)
         self.db.set('dialog_version', DialogManager.version)
 
 
@@ -293,7 +297,7 @@ class DialogManager:
                 response = TextMessage(text=response)
 
             # Send the response
-            self.interface.post_message(self.uid, response)
+            self.interface.post_message(local_id(self.uid), local_id(self.chat_id), response)
 
             # Record if recording
             if self.recording:
@@ -303,3 +307,12 @@ class DialogManager:
             # Log the response
             self.log.info('Message: {}'.format(response))
             self.logger.log_bot_message(response, self.current_state_name)
+
+
+def local_id(id):
+    """
+    Removes any prefixes from the ID.
+    :param id:
+    :return:
+    """
+    return id.split('_', maxsplit=1)[1]
