@@ -1,45 +1,3 @@
-
-
-class ThreadSetting():
-    def to_response(self):
-        pass
-
-
-class GreetingSetting(ThreadSetting):
-    def __init__(self, message):
-        self.message = message
-
-    def __str__(self):
-        return 'greeting_setting'
-
-
-class GetStartedSetting(ThreadSetting):
-    def __init__(self, payload):
-        self.payload = payload
-
-    def __str__(self):
-        return 'get_started_setting'
-
-
-class MenuSetting(ThreadSetting):
-    def __init__(self, elements=None):
-        self.elements = [MenuElement(**element) for element in elements or []]
-
-    def __str__(self):
-        text = 'menu:'
-        for element in self.elements:
-            text += "\n " + str(element)
-        return text
-
-    def add_element(self, element):
-        self.elements.append(element)
-        return element
-
-    def create_element(self, **kwargs):
-        element = MenuElement(**kwargs)
-        return self.add_element(element)
-
-
 class MenuElement():
     def __init__(self, type, title, payload=None, url=None,
                  webview_height_ratio=None, messenger_extensions=None):
@@ -59,11 +17,17 @@ class MenuElement():
 
 
 class MessageElement:
+    """
+    Base class for message elements.
+    """
     def to_message(self, fbid):
         return {"recipient": {"id": fbid}, "message": self.to_response()}
 
     def to_response(self):
         pass
+
+    def get_response_for(self, platform='fb'):
+        return str(self)  # TODO
 
     def __str__(self):
         return str(self.__dict__)
@@ -81,6 +45,10 @@ class SenderActionMessage(MessageElement):
 
 
 class TextMessage(MessageElement):
+    """
+    A plain text message. You can attach buttons or quick replies.
+    """
+
     def __init__(self, text='', buttons=None, quick_replies=None):
         from .quick_reply import QuickReply
         self.text = text
@@ -131,6 +99,10 @@ class TextMessage(MessageElement):
 
 
 class GenericTemplateMessage(MessageElement):
+    """
+    A horizontal list of GenericTemplateElement items.
+    """
+
     def __init__(self, elements=None):
         self.elements = [GenericTemplateElement(**element) for element in elements or []]
 
@@ -188,6 +160,10 @@ class AttachmentMessage(MessageElement):
 
 
 class GenericTemplateElement(MessageElement):
+    """
+    A horizontal card view with title, subtitle, image and buttons.
+    """
+
     def __init__(self, title, image_url=None, subtitle=None, item_url=None, buttons=None):
         self.title = title
         self.image_url = image_url

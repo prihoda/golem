@@ -5,6 +5,10 @@ from golem.core.serialize import json_serialize
 
 
 class QuickReply(MessageElement):
+    """
+    A button with text that gets sent as message when clicked.
+    """
+
     def __init__(self, title=None, payload=None, image_url=None):
         self.title = title
         self.payload = payload
@@ -30,6 +34,11 @@ class QuickReply(MessageElement):
 
 
 class LocationQuickReply(QuickReply):
+    """
+    A button that asks for user's location when clicked.
+    Currently only supported on Facebook Messenger.
+    """
+
     def __init__(self):
         super().__init__()
 

@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from golem.core.responses.adapter import TelegramAdapter
+from golem.core.interfaces.adapter.telegram import TelegramAdapter
 from golem.core.responses.buttons import LinkButton, PayloadButton
 from golem.core.responses.quick_reply import QuickReply
 from golem.core.responses.responses import TextMessage, GenericTemplateMessage, GenericTemplateElement

@@ -53,7 +53,7 @@ class TelegramInterface():
 
     @staticmethod
     def post_message(uid, chat_id, response):
-        from golem.core.responses.adapter import TelegramAdapter
+        from golem.core.interfaces.adapter.telegram import TelegramAdapter
         base_url = TelegramInterface.get_base_url()
         if not base_url:
             return

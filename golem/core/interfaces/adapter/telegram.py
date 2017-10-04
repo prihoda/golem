@@ -1,6 +1,5 @@
 import json
 import logging
-from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from golem.core.responses.buttons import Button, LinkButton, PayloadButton
@@ -9,18 +8,7 @@ from golem.core.responses.responses import *
 from golem.core.responses.templates import ListTemplate
 
 
-class ResponseAdapter(ABC):
-    @abstractmethod
-    def to_response(self, element):
-        pass
-
-
 class TelegramAdapter():
-
-    """
-    Converts messages to Telegram API methods and parameters.
-    """
-
     def __init__(self, chat_id):
         try:
             self.id = int(chat_id)

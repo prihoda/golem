@@ -6,6 +6,9 @@ from golem.core.serialize import json_serialize
 
 
 class Button(MessageElement, ABC):
+    """
+    An abstract chat button. Don't use this class directly.
+    """
 
     @abstractmethod
     def to_response(self):
@@ -17,6 +20,10 @@ class Button(MessageElement, ABC):
 
 
 class PayloadButton(Button):
+    """
+    A button that sends predefined data back to the bot when clicked.
+    """
+
     def __init__(self, title, payload):
         super(Button, self).__init__()
         self.title = title
@@ -34,6 +41,10 @@ class PayloadButton(Button):
 
 
 class LinkButton(Button):
+    """
+    A button that opens a website when clicked.
+    """
+
     def __init__(self, title, url, webview=True):
         super(Button, self).__init__()
         self.title = title
@@ -53,6 +64,11 @@ class LinkButton(Button):
 
 
 class PhoneButton(Button):
+    """
+    A button that calls a number when clicked.
+    Currently only Facebook Messenger is supported.
+    """
+
     def __init__(self, title, phone_number):
         super(Button, self).__init__()
         self.title = title
@@ -70,6 +86,10 @@ class PhoneButton(Button):
 
 
 class AccountLinkButton(Button):
+    """
+    A button that shows the FB messenger account linking dialog when clicked.
+    """
+
     def __init__(self, url):
         super(Button, self).__init__()
         self.url = url
@@ -85,6 +105,10 @@ class AccountLinkButton(Button):
 
 
 class AccountUnlinkButton(Button):
+    """
+    A button that shows the FB messenger account unlinking dialog when clicked.
+    """
+
     def __init__(self, url):
         super(Button, self).__init__()
         self.url = url
@@ -99,6 +123,11 @@ class AccountUnlinkButton(Button):
 
 
 class ShareButton(Button):
+    """
+    A button that opens share dialog for the message it's attached to.
+    Currently only Facebook Messener is supported.
+    """
+
     def __init__(self):
         super(Button, self).__init__()
 

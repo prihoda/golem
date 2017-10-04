@@ -9,6 +9,7 @@ from golem.core.persistence import get_redis
 from golem.core.responses.buttons import *
 from golem.core.responses.quick_reply import QuickReply
 from golem.core.responses.responses import *
+from golem.core.responses.settings import ThreadSetting, GreetingSetting, GetStartedSetting, MenuSetting
 from golem.core.responses.templates import ListTemplate
 from golem.core.serialize import json_deserialize
 from golem.tasks import accept_user_message
