@@ -164,7 +164,7 @@ class ConversationTest:
                 self.buttons[button.title] = {'payload':button.payload, 'url':button.url}
 
         if isinstance(action, StateChange):
-            state = TestInterface.states.pop(0)
+            state = TestInterface.states.pop(0) if TestInterface.states else None
             action.check(state)
 
         return None

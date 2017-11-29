@@ -14,7 +14,8 @@ import json
 def teach_wit(wit_token, entity, values, doc=""):
     import requests
     print('*** TEACHING WIT ***')
-    params = {'v':'20160516'}
+    params = {'v':'20170307'}
+    print('Inserting values of {}'.format(entity))
     rsp = requests.request(
         'PUT',
         'https://api.wit.ai/entities/'+entity,
