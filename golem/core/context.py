@@ -118,7 +118,7 @@ class Context:
 
     def set(self, entity, value_dict):
         if not isinstance(value_dict, dict):
-            raise ValueError('Use a dict to set a context value, e.g. {"value":"foo"}')
+            raise ValueError('Use a dict to set a context value, e.g. {"value":"foo"}. Call multiple times to add more.')
         if entity not in self.entities:
             self.entities[entity] = []
         value_dict['counter'] = self.counter

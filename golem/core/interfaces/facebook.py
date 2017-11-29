@@ -85,7 +85,6 @@ class FacebookInterface():
             print('SENDING SETTING:', response_dict)
         else:
             raise ValueError('Error: Invalid message type: {}: {}'.format(type(response), response))
-
         prefix_post_message_url = 'https://graph.facebook.com/v2.6/me/'
         token = settings.GOLEM_CONFIG.get('FB_PAGE_TOKEN')
         post_message_url = prefix_post_message_url+request_mode+'?access_token='+token
@@ -199,10 +198,10 @@ class FacebookInterface():
             if response.url:
                 message['type'] = 'web_url'
                 message['url'] = response.url
+                message['webview_height_ratio'] = response.webview_height_ratio
             if response.phone_number:
                 message['type'] = 'phone_number'
-                message['payload'] = response.url
-                message['webview_height_ratio'] = response.webview_height_ratio
+                message['payload'] = response.phone_number
             return message
 
         raise ValueError('Error: Invalid message type: {}: {}'.format(type(response), response))

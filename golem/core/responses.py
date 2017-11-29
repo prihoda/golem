@@ -260,6 +260,7 @@ class Button(MessageElement):
         if self.url:
             response['type'] = 'web_url'
             response['url'] = self.url
+            response['webview_height_ratio'] = self.webview_height_ratio
         if self.phone_number:
             response['type'] = 'phone_number'
             response['payload'] = self.url
