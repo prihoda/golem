@@ -32,7 +32,7 @@ class DialogManager:
         version = self.db.get('dialog_version')
         self.log.info('Initializing dialog for user %s...' % uid)
         self.current_state_name = None
-        self.context = None
+        self.context = None  # type: Context
         if version and version.decode('utf-8') == DialogManager.version and self.db.hexists('session_entities',
                                                                                             self.chat_id):
             entities_string = self.db.hget('session_entities', self.chat_id)
@@ -52,7 +52,7 @@ class DialogManager:
             history = []
             self.init_flows()
             self.logger.log_user(self.profile)
-        self.context = Context(entities=entities, history=history, counter=counter, dialog=self)
+        self.context = Context(entities=entities, history=history, counter=counter, dialog=self)  # type: Context
 
     def init_flows(self):
         self.flows = {}

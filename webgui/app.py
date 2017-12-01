@@ -10,4 +10,4 @@ class WebGui(AppConfig):
 
     def ready(self):
         from .interface import WebGuiInterface
-        all.add_interface(WebGuiInterface)
+        all.register_chat_interface(WebGuiInterface)

@@ -1,9 +1,11 @@
 import json
 from golem.core.serialize import json_serialize
 
+
 class ThreadSetting():
     def to_response(self):
         pass
+
 
 class GreetingSetting(ThreadSetting):
     def __init__(self, message):
@@ -12,12 +14,14 @@ class GreetingSetting(ThreadSetting):
     def __str__(self):
         return 'greeting_setting'
 
+
 class GetStartedSetting(ThreadSetting):
     def __init__(self, payload):
         self.payload = payload
 
     def __str__(self):
         return 'get_started_setting'
+
 
 class MenuSetting(ThreadSetting):
     def __init__(self, elements=None):
@@ -26,7 +30,7 @@ class MenuSetting(ThreadSetting):
     def __str__(self):
         text = 'menu:'
         for element in self.elements:
-            text += "\n "+str(element)
+            text += "\n " + str(element)
         return text
 
     def add_element(self, element):
@@ -47,7 +51,7 @@ class MenuElement():
         self.url = url
 
     def __str__(self):
-        text = 'element: '+self.title
+        text = 'element: ' + self.title
         return text
 
     def add_button(self, button):
@@ -65,17 +69,21 @@ class MessageElement:
 
     def to_response(self):
         pass
+
     def __str__(self):
         return str(self.__dict__)
+
     def __repr__(self):
         return str(self)
+
 
 class SenderActionMessage(MessageElement):
     def __init__(self, action):
         self.action = action
 
     def to_message(self, fbid):
-        return {'sender_action':self.action, 'recipient':{"id": fbid}}
+        return {'sender_action': self.action, 'recipient': {"id": fbid}}
+
 
 class TextMessage(MessageElement):
     def __init__(self, text='', buttons=None, quick_replies=None):
@@ -86,16 +94,16 @@ class TextMessage(MessageElement):
     def to_response(self):
         if self.buttons:
             return {
-                "attachment":{
-                   "type":"template",
-                   "payload":{
-                     "template_type":"button",
-                     "text": self.text,
-                     "buttons": [button.to_response() for button in self.buttons]
-                   }
+                "attachment": {
+                    "type": "template",
+                    "payload": {
+                        "template_type": "button",
+                        "text": self.text,
+                        "buttons": [button.to_response() for button in self.buttons]
+                    }
                 }
-              }
-        response = {'text' : self.text}
+            }
+        response = {'text': self.text}
         if self.quick_replies:
             response["quick_replies"] = [reply.to_response() for reply in self.quick_replies]
         return response
@@ -103,9 +111,9 @@ class TextMessage(MessageElement):
     def __str__(self):
         text = self.text
         for button in self.buttons:
-            text += "\n "+str(button)
+            text += "\n " + str(button)
         for reply in self.quick_replies:
-            text += "\n "+str(reply)
+            text += "\n " + str(reply)
         return text
 
     def add_button(self, button):
@@ -128,26 +136,28 @@ class TextMessage(MessageElement):
         quick_reply = QuickReply(**kwargs)
         return self.add_quick_reply(quick_reply)
 
+
 class GenericTemplateMessage(MessageElement):
     def __init__(self, elements=None):
         self.elements = [GenericTemplateElement(**element) for element in elements or []]
 
     def to_response(self):
         return {
-            "attachment":{
-               "type":"template",
-               "payload":{
-                 "template_type":"generic",
-                 "elements": [element.to_response() for element in self.elements[:10]]
-               }
+            "attachment": {
+                "type": "template",
+                "payload": {
+                    "template_type": "generic",
+                    "elements": [element.to_response() for element in self.elements[:10]]
+                }
             }
         }
 
     def __str__(self):
         text = 'generic template:'
         for element in self.elements:
-            text += "\n "+str(element)
+            text += "\n " + str(element)
         return text
+
     def add_element(self, element):
         self.elements.append(element)
         return element
@@ -156,6 +166,7 @@ class GenericTemplateMessage(MessageElement):
         element = GenericTemplateElement(**kwargs)
         return self.add_element(element)
 
+
 class AttachmentMessage(MessageElement):
     def __init__(self, attachment_type, url):
         self.attachment_type = attachment_type
@@ -163,16 +174,17 @@ class AttachmentMessage(MessageElement):
 
     def to_response(self):
         return {
-            "attachment":{
+            "attachment": {
                 "type": self.attachment_type,
-                "payload":{
-                  "url":self.url
+                "payload": {
+                    "url": self.url
                 }
             }
         }
 
+
 # TODO stickers not yet supported by Messenger :(
-#class StickerMessage(MessageElement):
+# class StickerMessage(MessageElement):
 #    def __init__(self, sticker_id):
 #        self.sticker_id = sticker_id
 #
@@ -180,7 +192,7 @@ class AttachmentMessage(MessageElement):
 #        return {
 #            "sticker_id": self.sticker_id
 #        }
-    
+
 class GenericTemplateElement(MessageElement):
     def __init__(self, title, image_url=None, subtitle=None, item_url=None, buttons=None):
         self.title = title
@@ -201,11 +213,11 @@ class GenericTemplateElement(MessageElement):
         return response
 
     def __str__(self):
-        text = 'element: '+self.title
+        text = 'element: ' + self.title
         if self.subtitle:
-            text += " ("+self.subtitle+")"
+            text += " (" + self.subtitle + ")"
         for button in self.buttons:
-            text += "\n  "+str(button)
+            text += "\n  " + str(button)
         return text
 
     def add_button(self, button):
@@ -228,19 +240,19 @@ class QuickReply(MessageElement):
         response = {
             "content_type": self.content_type
         }
-        if self.content_type=='text':
+        if self.content_type == 'text':
             response['title'] = self.title[:20]
             response['payload'] = json.dumps(self.payload if self.payload else {}, default=json_serialize)
         return response
 
-
     def __str__(self):
         text = 'quick_reply: '
         if self.title:
-            text += self.title+': '
+            text += self.title + ': '
         if self.payload:
             text += _get_payload_string(self.payload)
         return text
+
 
 class Button(MessageElement):
     def __init__(self, title, payload=None, url=None, phone_number=None, webview_height_ratio='full'):
@@ -267,18 +279,19 @@ class Button(MessageElement):
         return response
 
     def __str__(self):
-        text = 'button: '+self.title
+        text = 'button: ' + self.title
         if self.payload:
-            text += ": "+_get_payload_string(self.payload)
+            text += ": " + _get_payload_string(self.payload)
         if self.url:
-            text += ": "+self.url
+            text += ": " + self.url
         if self.phone_number:
-            text += ": "+self.phone_number
+            text += ": " + self.phone_number
         return text
+
 
 def _get_payload_string(payload):
     text = ''
-    for entity,values in payload.items():
+    for entity, values in payload.items():
         if isinstance(values, list):
             for value in values:
                 text += '/{}/{}/ '.format(entity, value)

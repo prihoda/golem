@@ -1,7 +1,10 @@
 import time
+from datetime import datetime
 
-from django.http import HttpResponse, HttpResponseBadRequest
-from django.shortcuts import render
+from django.db.models import Max
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.shortcuts import render, redirect
+from django.conf import settings
 
 from .forms import MessageForm
 from .interface import WebGuiInterface
@@ -24,7 +27,12 @@ def webgui(request):
             return HttpResponse()
 
         messages = Message.objects.filter(uid=uid).order_by('timestamp')
-        context = {'uid': uid, 'messages': messages, 'form': MessageForm}
+        context = {
+            'uid': uid, 'messages': messages,
+            'form': MessageForm, 'timestamp': datetime.now().timestamp(),
+            'user_img': settings.GOLEM_CONFIG.get('WEBGUI_USER_IMAGE', 'images/icon_user.png'),
+            'bot_img': settings.GOLEM_CONFIG.get('WEBGUI_BOT_IMAGE', 'images/icon_robot.png')
+        }
         return render(request, 'index.html', context)
     else:
         return render(request, 'welcome.html')
@@ -46,4 +54,12 @@ def do_logout(request):
         WebGuiInterface.destroy_uid(request.session['uid'])
         del request.session['uid']
         del request.session['username']
-    return HttpResponse()
+    return redirect('webgui')
+
+
+def get_last_change(request):
+    if 'uid' in request.session:
+        uid = request.session['uid']
+        max_timestamp = Message.objects.filter(uid=uid).aggregate(Max('timestamp'))
+        return JsonResponse(max_timestamp)
+    return HttpResponseBadRequest()

@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
             name='Button',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', primary_key=True, serialize=False, auto_created=True)),
-                ('text', models.CharField(max_length=256)),
+                ('text', models.CharField(max_length=256, blank=True, null=True)),
                 ('action', models.CharField(max_length=256, blank=True, null=True)),
                 ('url', models.CharField(max_length=1024, blank=True, null=True)),
             ],
@@ -23,7 +23,7 @@ class Migration(migrations.Migration):
             name='Element',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', primary_key=True, serialize=False, auto_created=True)),
-                ('title', models.CharField(max_length=256)),
+                ('title', models.CharField(max_length=256, blank=True, null=True)),
                 ('subtitle', models.CharField(max_length=256, blank=True, null=True)),
                 ('image_url', models.CharField(max_length=256, blank=True, null=True)),
             ],

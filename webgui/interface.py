@@ -5,6 +5,7 @@ import time
 from django.db import OperationalError
 
 from golem.core.message_parser import parse_text_message
+from golem.core.responses.quick_reply import LocationQuickReply
 from golem.tasks import accept_user_message
 from .models import Message, Button, Element
 
@@ -25,7 +26,7 @@ class WebGuiInterface:
         return {'first_name': 'Tests', 'last_name': ''}
 
     @staticmethod
-    def post_message(uid, response):
+    def post_message(uid, chat_id, response):
         uid = uid.split('_', 1)[1]
         WebGuiInterface.messages.append(response)
         message = Message()
@@ -53,8 +54,12 @@ class WebGuiInterface:
             for q in response.quick_replies:
                 b = Button()
                 b.message_id = message.id
-                b.text = q.title
-                b.action = 'reply'
+                if isinstance(q, LocationQuickReply):
+                    b.text = 'My location\n(unsupported in web gui)'
+                    b.action = 'null'  # TODO support sending location
+                else:
+                    b.text = q.title
+                    b.action = 'reply'
                 b.save()
         except AttributeError:
             pass
@@ -76,11 +81,11 @@ class WebGuiInterface:
         pass
 
     @staticmethod
-    def processing_start(uid):
+    def processing_start(uid, chat_id):
         pass
 
     @staticmethod
-    def processing_end(uid):
+    def processing_end(uid, chat_id):
         pass
 
     @staticmethod
@@ -90,18 +95,23 @@ class WebGuiInterface:
 
     @staticmethod
     def parse_message(user_message, num_tries=1):
+        logging.info('[WEBGUI] @ parse_message')
         return parse_text_message(user_message)
 
     @staticmethod
     def accept_request(msg: Message):
-        logging.critical('Got message')
+        logging.info('[WEBGUI] Received message from {}'.format(str(msg.uid)))
         accept_user_message.delay('webgui', 'web_' + str(msg.uid), msg.text)
 
     @staticmethod
     def make_uid(username) -> str:
-        # FIXME ensure uid doesn't exist or is expired
-        uid = '_'.join([str(username), str(random.randint(1000, 9999))])
+        uid = None
+        tries = 0
+        while (not uid or len(Message.objects.filter(uid__exact=uid)) != 0) or tries < 100:
+            uid = '_'.join([str(username), str(random.randint(1000, 99999))])
+            tries += 1
         # delete messages for old session with this uid, if there was one
+        # FIXME invalidate the previous user's session!
         try:
             Message.objects.get(uid__exact=uid).delete()
         except Exception:
@@ -110,4 +120,4 @@ class WebGuiInterface:
 
     @staticmethod
     def destroy_uid(uid):
-        Message.objects.get(uid__exact=uid).delete()
+        Message.objects.filter(uid__exact=uid).delete()

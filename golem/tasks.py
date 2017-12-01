@@ -1,6 +1,7 @@
 import time
 import traceback
 
+import os
 from celery import shared_task
 from celery.task.schedules import crontab
 from celery.utils.log import get_task_logger
@@ -15,6 +16,7 @@ logger = get_task_logger(__name__)
 def accept_user_message(interface_name, uid, raw_message, chat_id=None):
     from golem.core.dialog_manager import DialogManager
     print("Accepting message, uid {}, chat_id {}, message: {}".format(uid, chat_id, raw_message))
+    log_message_to_file.delay(raw_message)
     interface = create_from_name(interface_name)
     prefixed_uid = interface.prefix + '_' + uid
     if chat_id:
@@ -101,3 +103,16 @@ def _process_message(dialog, parsed):
         print("!!!!!!!!!!!!!!!! EXCEPTION AT MESSAGE QUEUE !!!!!!!!!!!!!!!", e)
         traceback.print_exc()
         dialog.logger.log_error(exception=e, state=dialog.current_state_name)
+
+
+@shared_task
+def log_message_to_file(text):
+    """Logs all received messages to file. (has to exist)"""
+    if text:
+        text = text.replace('\n', ' ')
+        path = os.path.join('data', 'log', 'messages.txt')
+        import fcntl
+        with open(path, 'a') as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            f.write(text + '\n')
+            fcntl.flock(f, fcntl.LOCK_UN)

@@ -45,9 +45,30 @@ def clear_wit_cache():
 
 clear_wit_cache()
 
+
+def parse_with_wit(text, wit_token, num_tries=1):
+    try:
+        wit_client = Wit(access_token=wit_token, actions={})
+        return wit_client.message(text)
+    except Exception as e:
+        print('WIT ERROR: ', e)
+        # try to parse again 5 times
+        if num_tries > 5:
+            raise
+        else:
+            return parse_with_wit(text, wit_token, num_tries=num_tries + 1)
+
+
+def parse_with_nlp(text):
+    from golem.nlp.classify import classify  # avoid importing tf and spacy when not needed
+    return {'type': 'message', 'entities': classify(text)}
+
+
 def parse_text_message(text, num_tries=1):
     wit_token = settings.GOLEM_CONFIG.get('WIT_TOKEN')
-    if not wit_token:
+    nlp_data_dir = settings.GOLEM_CONFIG.get('NLP_DATA_DIR')
+    if not wit_token and not nlp_data_dir:
+        print('No NLP engines configured!')
         return {'type':'message','entities': {'_message_text' : {'value':text}}}
 
     cache_key = 'wit_cache'
@@ -60,17 +81,12 @@ def parse_text_message(text, num_tries=1):
             print('Got cached wit key: "{}" = {}'.format(cache_key, parsed))
             return parsed
 
-    try:
-        wit_client = Wit(access_token=wit_token, actions={})
-        wit_parsed = wit_client.message(text)
-        #print(wit_parsed)
-    except Exception as e:
-        print('WIT ERROR: ', e)
-        # try to parse again 5 times
-        if num_tries > 5:
-            raise
-        else:
-            return parse_text_message(text, num_tries=num_tries+1)
+    if nlp_data_dir:
+        wit_parsed = parse_with_nlp(text)
+    elif wit_token:
+        wit_parsed = parse_with_wit(text, wit_token)
+    else:
+        raise Exception('NLP is not set up')
 
     entities = wit_parsed['entities']
     print('WIT ENTITIES:', entities)
@@ -141,7 +157,7 @@ def process_datetime(append, values, duration=None):
                     date_from = datetime.datetime.now().replace(tzinfo=pytz.timezone('Europe/Prague'))
                 else:
                     date_from = dateutil.parser.parse(value['from']['value'])
-                date_to = dateutil.parser.parse(value['to']['value'])
+                date_to = dateutil.parser.parse(value['to']['value']) - timedelta(seconds=1)
                 grain = value['from']['grain']
             else:
                 grain = value['grain']
