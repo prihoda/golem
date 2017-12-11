@@ -73,6 +73,7 @@ def accept_inactivity_callback(interface_name, uid, context_counter, callback_na
 
     # User has sent a message, cancel inactivity callback
     if dialog.context.counter != context_counter:
+        print('Canceling inactivity callback after user message.')
         return
 
     parsed = {

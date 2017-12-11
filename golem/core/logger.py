@@ -4,8 +4,9 @@ import time
 from golem.core.persistence import get_elastic
 
 class Logger:
-    def __init__(self, uid, interface):
+    def __init__(self, uid, interface, test_id=None):
         self.uid = uid
+        self.test_id = test_id
         self.interface = interface
 
     def log_user_message(self, type_, entities, accepted_time, state):
@@ -18,6 +19,7 @@ class Logger:
 
         message = {
             'uid' : self.uid,
+            'test_id' : self.test_id,
             'created': accepted_time,
             'is_user' : True,
             'text' : text,
@@ -38,6 +40,7 @@ class Logger:
 
         message = {
             'uid' : self.uid,
+            'test_id' : self.test_id,
             'created': time.time(),
             'is_user' : False,
             'text' : text,
@@ -50,6 +53,7 @@ class Logger:
     def log_error(self, exception, state):
         message = {
             'uid' : self.uid,
+            'test_id' : self.test_id,
             'created': time.time(),
             'is_user' : False,
             'text' : str(exception),

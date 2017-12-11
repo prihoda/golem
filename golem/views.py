@@ -11,6 +11,7 @@ from django.views import generic
 from django.conf import settings  
 from golem.core.interfaces.telegram import TelegramInterface
 from golem.core.interfaces.facebook import FacebookInterface
+from django.contrib.auth.decorators import login_required
 
 class FacebookView(generic.View):
 
@@ -52,7 +53,7 @@ class TelegramView(generic.View):
         return HttpResponse()
 
 
-
+@login_required
 def test(request):
 
     with open('test/results.json') as infile:
@@ -88,18 +89,18 @@ def run_test(request, name):
 
     module = importlib.import_module('test.tests.'+name)
     imp.reload(module)
-    return _run_test_actions(module.actions)
+    return _run_test_actions(name, module.actions)
 
 def run_test_message(request, message):
-    return _run_test_actions([UserTextMessage(message)])
+    return _run_test_actions('message', [UserTextMessage(message)])
 
 
-def _run_test_actions(actions):
-    test = ConversationTest()
+def _run_test_actions(name, actions):
+    test = ConversationTest(name, actions)
     start_time = time.time()
     report = None
     try:
-      report = test.run(actions)
+      report = test.run()
     except Exception as e:
       log = TestLog.get()
       fatal = not isinstance(e, ConversationTestException)
@@ -119,6 +120,33 @@ def test_record(request):
     response['Content-Disposition'] = 'attachment; filename=mytest.py'
     return response
 
+@login_required
+def log_tests(request):
+
+    es = get_elastic()
+    if not es:
+        return HttpResponse('not able to connect to elasticsearch')
+
+    res = es.search(index="message-log", doc_type='message', body={
+    "size": 0,
+    "aggs" : {
+        "test_ids" : {
+            "terms" : { "field" : "test_id",  "size" : 500 }
+        }
+    }})
+    test_ids = []
+    for bucket in res['aggregations']['test_ids']['buckets']:
+        test_id = bucket['key']
+        test_ids.append({'id':'test_id_'+test_id, 'name':test_id})
+
+
+    context = {
+        'groups' : test_ids
+    }
+    template = loader.get_template('golem/log.html')
+    return HttpResponse(template.render(context,request))
+
+@login_required
 def log(request, user_limit):
 
     user_limit = int(user_limit) if user_limit else 100
@@ -164,30 +192,35 @@ def log(request, user_limit):
         }
     })
 
-    user_map = {user['_source']['uid']: user['_source'] for user in res['hits']['hits']}
-    users = [user_map[u['uid']] if u['uid'] in user_map else {'uid':u['uid']} for u in uids]
+    user_map = {user['_source']['uid']: {'name' : user['_source']['profile']['first_name'] + ' ' + user['_source']['profile']['last_name'], 'id' : 'uid_'+user['_source']['uid']} for user in res['hits']['hits']}
+    users = [user_map[u['uid']] if u['uid'] in user_map else {'id':'uid_'+u['uid'], 'name':u['uid']} for u in uids]
 
     context = {
-        'users': users
+        'groups': users
     }
 
     print(users)
     template = loader.get_template('golem/log.html')
     return HttpResponse(template.render(context,request))
 
-def log_user(request, uid, page=1):
+def log_conversation(request, group_id=None, page=1):
     page = int(page) if page else 1
     es = get_elastic()
     if not es:
         return HttpResponse()
 
+    term = {}
+    if group_id.startswith('uid_'):
+        term = { "uid" : group_id.replace('uid_','') }
+    elif group_id.startswith('test_id'):
+        term = {"test_id" : group_id.replace('test_id_','')}
     res = es.search(index="message-log", doc_type='message', body={
        "size": 50,
        "from" : 50*(page-1),
        "query": {
             "bool" : {
                 "filter" : {
-                    "term" : { "uid" : uid }
+                    "term" : term
                 }
             }
         },
@@ -212,7 +245,7 @@ def log_user(request, uid, page=1):
         messages.append(message)
 
     context = {'messages': messages}
-    template = loader.get_template('golem/log_user.html')
+    template = loader.get_template('golem/log_conversation.html')
     return HttpResponse(template.render(context,request))
 
 def debug(request):

@@ -1,70 +1,7 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Tests - Golem utils</title>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style type="text/css"></style>
-<style>
-.test {
-  cursor: pointer;
-}
-.test-name {
-}
-.test-passed {
-  background: #ccffcc;
-}
-.test-failed {
-  background: #ffddaa;
-}
-.test-exception {
-  background: #ffaaaa;
-}
-.header2 th {
-  font-weight: normal;
-}
-.total {
-  color: white;
-  font-weight: bold;
-}
-.total.test-exception {
-  background: #dd3333;
-}
-.total.test-passed {
-  background: #11aa11;
-}
-.total.test-failed {
-  background: #dd5500;
-}
-.table tr.total td {
-  font-size: 110%;
-  padding: 12px 8px;
-  border-bottom: 5px solid white;
-}
-.hidden {
-  display: none;
-}
-.log {
-  font-size: 90%;
-}
-.log-message {
-  font-weight: bold;
-}
-.log-line, .log-message  {
-  border-radius: 3px;
-  margin: 5px;
-  padding: 5px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
-}
-.log-line p {
-  margin: 0;
-}
-</style>
-<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
-<script   src="https://code.jquery.com/jquery-3.1.1.min.js"   integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8="   crossorigin="anonymous"></script> 
-</head>
-<body>
+{% extends "base.html" %}
 
+{% block title %}Tests{% endblock %}
+{% block content %}
 {% load golem_extras %}
 <div class="container">
   <div class="row">
@@ -148,5 +85,62 @@ function load_user(uid, page){
 
 }
 </script>
-</body>
-</html>
+{% endblock %}
+
+{% block headers %}
+<style>
+.test {
+  cursor: pointer;
+}
+.test-name {
+}
+.test-passed {
+  background: #ccffcc;
+}
+.test-failed {
+  background: #ffddaa;
+}
+.test-exception {
+  background: #ffaaaa;
+}
+.header2 th {
+  font-weight: normal;
+}
+.total {
+  color: white;
+  font-weight: bold;
+}
+.total.test-exception {
+  background: #dd3333;
+}
+.total.test-passed {
+  background: #11aa11;
+}
+.total.test-failed {
+  background: #dd5500;
+}
+.table tr.total td {
+  font-size: 110%;
+  padding: 12px 8px;
+  border-bottom: 5px solid white;
+}
+.hidden {
+  display: none;
+}
+.log {
+  font-size: 90%;
+}
+.log-message {
+  font-weight: bold;
+}
+.log-line, .log-message  {
+  border-radius: 3px;
+  margin: 5px;
+  padding: 5px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+}
+.log-line p {
+  margin: 0;
+}
+</style>
+{% endblock %}

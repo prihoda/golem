@@ -16,10 +16,11 @@ from golem.tasks import accept_inactivity_callback, accept_schedule_callback
 class DialogManager:
     version = '1.28'
 
-    def __init__(self, uid, interface):
+    def __init__(self, uid, interface, test_id=None):
         self.uid = uid
+        self.test_id = test_id
         self.interface = interface
-        self.logger = Logger(uid=uid, interface=interface)
+        self.logger = Logger(uid=uid, interface=interface, test_id=test_id)
         self.profile = interface.load_profile(uid)
         self.db = get_redis()
         self.log = logging.getLogger()

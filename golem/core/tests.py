@@ -101,10 +101,14 @@ class StateChange():
 
 
 class ConversationTest:
-    def run(self, actions):
+    def __init__(self, name, actions):
+        self.name = name
+        self.actions = actions
+
+    def run(self):
         self.init()
         stats = []
-        for action in actions:
+        for action in self.actions:
             stat = self.run_action(action)
             if stat:
                 stats.append(stat)
@@ -128,7 +132,6 @@ class ConversationTest:
         
 
     def run_action(self, action):
-
         
         if isinstance(action, UserButtonMessage):
             payload = self.buttons.get(action.title, {}).get('payload')
@@ -139,7 +142,7 @@ class ConversationTest:
         if isinstance(action, UserMessage):
             from .dialog_manager import DialogManager
             start_time = time.time()
-            dialog = DialogManager(uid='test', interface=TestInterface)
+            dialog = DialogManager(uid='test', interface=TestInterface, test_id=self.name)
             time_init = time.time() - start_time
             start_time = time.time()
             parsed = action.get_parsed()
