@@ -10,11 +10,12 @@ from django.conf import settings
 from dateutil.relativedelta import relativedelta
 from django.utils import timezone
 import json
+from urllib.parse import quote
 
 def teach_wit(wit_token, entity, values, doc=""):
     import requests
     print('*** TEACHING WIT ***')
-    params = {'v':'20170307'}
+    params = {'v':'20160526'}
     print('Inserting values of {}'.format(entity))
     rsp = requests.request(
         'PUT',
@@ -24,7 +25,7 @@ def teach_wit(wit_token, entity, values, doc=""):
             'accept': 'application/json'
         },
         params=params,
-        json={'doc':doc, 'values':values}
+        json={'doc':doc or entity, 'values':values}
     )
     if rsp.status_code > 200:
         raise ValueError('Wit responded with status: ' + str(rsp.status_code) +
