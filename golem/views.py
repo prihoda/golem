@@ -73,7 +73,7 @@ def run_all_tests(request):
 def _get_test_modules(path):
     from os import listdir
     from os.path import join
-    return [f.replace('.py','') for f in listdir(path) if join(path, f).endswith('.py') and not f.startswith('_')]
+    return sorted([f.replace('.py','') for f in listdir(path) if join(path, f).endswith('.py') and not f.startswith('_')])
 
 @login_required
 def test(request):
