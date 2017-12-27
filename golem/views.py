@@ -137,7 +137,8 @@ def log_tests(request):
     test_ids = []
     for bucket in res['aggregations']['test_ids']['buckets']:
         test_id = bucket['key']
-        test_ids.append({'id':'test_id_'+test_id, 'name':test_id})
+        test_name = test_id.replace('_',' ').capitalize()
+        test_ids.append({'id':'test_id_'+test_id, 'name':test_name})
 
 
     context = {

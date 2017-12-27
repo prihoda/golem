@@ -59,9 +59,14 @@ class BotMessage():
     def __init__(self, klass):
         self.klass = klass
         self.text = None
+        self.can_be_repeated = False
 
     def with_text(self, text):
         self.text = text
+        return self
+
+    def repeated(self):
+        self.can_be_repeated = True
         return self
 
     def check(self, message):
@@ -153,18 +158,29 @@ class ConversationTest:
             return {'init':time_init, 'parsing':time_parsing, 'processing':time_processing}
 
         if isinstance(action, BotMessage):
-            message = TestInterface.messages.pop(0)
+            message = TestInterface.messages.pop(0) if TestInterface.messages else None
             action.check(message)
+            if action.can_be_repeated:
+                while TestInterface.messages:
+                    peek = TestInterface.messages[0]
+                    try:
+                        action.check(peek)
+                        print('Message matches repeatable message, popping: {}'.format(peek))
+                        message = TestInterface.messages.pop(0)
+                    except:
+                        break
             buttons = []
             if isinstance(message, TextMessage):
                 buttons = message.buttons
+                buttons += message.quick_replies
             if isinstance(message, GenericTemplateMessage):
                 for element in message.elements:
                     buttons += element.buttons
             for button in buttons:
                 if button.payload:
                     button.payload['_log_text'] = button.title
-                self.buttons[button.title] = {'payload':button.payload, 'url':button.url}
+                print('Adding button {}'.format(button.title))
+                self.buttons[button.title] = {'payload':button.payload, 'url':getattr(button, 'url', None)}
 
         if isinstance(action, StateChange):
             state = TestInterface.states.pop(0) if TestInterface.states else None
