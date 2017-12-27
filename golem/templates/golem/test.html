@@ -7,6 +7,7 @@
   <div class="row">
     <div class="col-xs-12" id="header">
       <h3>Tests</h3>
+      <h3>Updated: {{ updated_time }} <button class="btn btn-default run-tests">Run tests</button></h3>
 
       <table id="tests" class="table">
         
@@ -73,6 +74,17 @@ $(function(){
   $('[data-toggle]').click(function(){
     $($(this).data('toggle')).toggleClass('hidden')
   })
+
+  $('.run-tests').click(function(){
+    $button = $(this)
+    $button.text('Running...')
+    $.get('/golem/run_all_tests', {}, function(e){
+      $button.text('Done.')
+      window.location.reload()
+    }).fail(function() {
+      alert( "Error running tests" );
+    })
+  });
   
 })
 

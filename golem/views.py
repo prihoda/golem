@@ -5,6 +5,7 @@ from golem.core.tests import ConversationTest, ConversationTestRecorder, Convers
 import json
 import time
 import traceback
+import datetime
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views import generic
@@ -52,17 +53,37 @@ class TelegramView(generic.View):
         TelegramInterface.accept_request(request_body)
         return HttpResponse()
 
+@login_required
+def run_all_tests(request):
+    modules = _get_test_modules('./tests/')
+
+    print('Running tests: {}'.format(modules))
+    tests = []
+    for module in modules:
+        print('Running tests "{}"'.format(module))
+        test = _run_test_module(module)
+        tests.append({'name':module, 'result':test})
+
+    results = {'tests':tests, 'updated_time' : str(datetime.datetime.now())}
+    db = get_redis()
+    db.set('test_results', json.dumps(results))
+
+    return JsonResponse(data=results, safe=False)
+
+def _get_test_modules(path):
+    from os import listdir
+    from os.path import join
+    return [f.replace('.py','') for f in listdir(path) if join(path, f).endswith('.py') and not f.startswith('_')]
 
 @login_required
 def test(request):
-
-    with open('test/results.json') as infile:
-        tests = json.load(infile)
+    db = get_redis()
+    results = json.loads(db.get('test_results').decode('utf-8'))
 
     status = 'passed'
     avg = {'duration':0, 'total':0, 'init':0, 'parsing':0, 'processing':0}
     passed = 0
-    for test in tests:
+    for test in results['tests']:
         result = test['result']
         if result['status'] == 'passed':
             passed += 1
@@ -78,22 +99,24 @@ def test(request):
         for key in avg:
             avg[key] = avg[key] / passed
 
-    context = {'tests':tests, 'avg':avg, 'status':status}
+    context = {'tests':results['tests'], 'avg':avg, 'status':status, 'updated_time' : results['updated_time']}
     template = loader.get_template('golem/test.html')
     return HttpResponse(template.render(context, request))
 
-
+@login_required
 def run_test(request, name):
-    import importlib
-    import imp
-
-    module = importlib.import_module('test.tests.'+name)
-    imp.reload(module)
-    return _run_test_actions(name, module.actions)
+    return JsonResponse(data=_run_test_module(name))
 
 def run_test_message(request, message):
     return _run_test_actions('message', [UserTextMessage(message)])
 
+def _run_test_module(name):
+    import importlib
+    import imp
+
+    module = importlib.import_module('tests.'+name)
+    imp.reload(module)
+    return _run_test_actions(name, module.actions)
 
 def _run_test_actions(name, actions):
     test = ConversationTest(name, actions)
@@ -108,10 +131,10 @@ def _run_test_actions(name, actions):
         trace = traceback.format_exc()
         print(trace)
         log.append(trace)
-      return JsonResponse(data={'status': 'exception' if fatal else 'failed', 'log':log, 'message':str(e), 'report':report})
+      return {'status': 'exception' if fatal else 'failed', 'log':log, 'message':str(e), 'report':report}
 
     elapsed_time = time.time() - start_time
-    return JsonResponse(data={'status': 'passed', 'log':TestLog.get(), 'duration':elapsed_time, 'report':report})
+    return {'status': 'passed', 'log':TestLog.get(), 'duration':elapsed_time, 'report':report}
 
 def test_record(request):
     response = ConversationTestRecorder.get_result()

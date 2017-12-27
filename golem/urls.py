@@ -5,6 +5,7 @@ from django.conf import settings
 urlpatterns = [
     url(r'^messenger/{}/?$'.format(settings.GOLEM_CONFIG.get('WEBHOOK_SECRET_URL')), views.FacebookView.as_view()),
     url(r'^telegram/{}/?$'.format(settings.GOLEM_CONFIG.get('WEBHOOK_SECRET_URL')), views.TelegramView.as_view()),
+    url(r'^run_all_tests/?$', views.run_all_tests),
     url(r'^run_test/(?P<name>[a-zA-Z0-9_\-]+)/?$', views.run_test),
     url(r'^run_test_message/(?P<message>[a-zA-Z0-9 _\-]+)/?$', views.run_test_message),
     url(r'^log/(?P<user_limit>[0-9]*)/?$', views.log),

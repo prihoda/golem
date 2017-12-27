@@ -239,7 +239,7 @@ class DialogManager:
 
             # notify the interface that the state was changed
             self.interface.state_change(self.current_state_name)
-            # record change if recording test
+            # record change if recording tests
             if self.recording:
                 ConversationTestRecorder.record_state_change(self.current_state_name)
 
