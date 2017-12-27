@@ -1,7 +1,7 @@
 {% load golem_extras %}
 {% for message in messages %}
     <div 
-    class="{% if message.switch %}message-switch{% endif %} {% if message.is_user %}message-user{% else %}message-bot{% endif %} pull-left message"
+    class="{% if message.switch %}message-switch{% endif %} {% if message.is_user %}message-user pull-right{% else %}message-bot pull-left{% endif %} message"
     data-meta="{{ message.json }}"
     >
     {% if message.response.elements %}
