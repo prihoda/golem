@@ -100,10 +100,6 @@ def parse_text_message(text, num_tries=1):
                     else:
                         grain = value['grain']
                         date_from = dateutil.parser.parse(value['value'])
-                        if grain == 'week' and date_from == date_this_week(date_from.tzinfo):
-                            # change "this week" to next 7 days
-                            date_from = timezone.now()
-                            date_to = date_from + timedelta(days=7)
                         date_to = date_from + timedelta_from_grain(grain)
                         if 'datetime' not in append:
                             append['datetime'] = []
@@ -191,8 +187,6 @@ def format_date_interval(from_date, to_date, grain):
     next_week = this_week + timedelta(days=7)
     this_month = date_this_month(tzinfo)
     next_month = date_this_month(tzinfo) + relativedelta(months=1)
-    print('This month: ', this_month)
-    print('Next month: ', next_month)
 
     diff_hours = (to_date-from_date).total_seconds() / 3600
     print('Diff hours: %s' % diff_hours)

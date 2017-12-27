@@ -239,7 +239,7 @@ actions = []
                         else:
                             message += '.produces_entity("{}")'.format(entity)
                 if body['type'] == 'postback':
-                    text_entity = body['entities']['_log_text'][0]
+                    text_entity = body['entities'].get('_message_text')[0]
                     text = text_entity['value']
                     message = 'UserButtonMessage("{}")'.format(text)
                 response += "\n\n"+'actions.append({})'.format(message) + "\n"
