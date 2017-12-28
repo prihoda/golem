@@ -1,5 +1,5 @@
 class TestInterface():
-    name = 'tests'
+    name = 'test'
     messages = []
     states = []
 

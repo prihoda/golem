@@ -131,7 +131,7 @@ class ConversationTest:
     def init(self):
         self.buttons = {}
         from .dialog_manager import DialogManager
-        DialogManager.clear_uid('tests')
+        DialogManager.clear_uid('test')
         TestLog.clear()
         TestInterface.clear()
         
@@ -147,7 +147,7 @@ class ConversationTest:
         if isinstance(action, UserMessage):
             from .dialog_manager import DialogManager
             start_time = time.time()
-            dialog = DialogManager(uid='tests', interface=TestInterface, test_id=self.name)
+            dialog = DialogManager(uid='test', interface=TestInterface, test_id=self.name)
             time_init = time.time() - start_time
             start_time = time.time()
             parsed = action.get_parsed()
