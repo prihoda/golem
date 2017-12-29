@@ -103,7 +103,6 @@ def test(request):
     template = loader.get_template('golem/test.html')
     return HttpResponse(template.render(context, request))
 
-@login_required
 def run_test(request, name):
     return JsonResponse(data=_run_test_module(name))
 
