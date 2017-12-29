@@ -75,6 +75,8 @@ class Logger:
             print('Unable to log message to Elasticsearch.')
 
     def log_user(self, profile):
+        if not self.enabled:
+            return
         user = {
             'uid' : self.uid,
             'profile': profile
