@@ -6,6 +6,7 @@ from golem.core.persistence import get_redis
 import json
 import time
 from django.conf import settings  
+import random
 
 class ConversationTestException(Exception):
     def __init__(self, message):
@@ -106,7 +107,9 @@ class StateChange():
 
 
 class ConversationTest:
-    def __init__(self, name, actions):
+    def __init__(self, name, actions, benchmark=False):
+        self.benchmark = benchmark
+        self.uid = 'benchmark_'+str(random.randint(1, 10000000)) if benchmark else 'test'
         self.name = name
         self.actions = actions
 
@@ -131,7 +134,7 @@ class ConversationTest:
     def init(self):
         self.buttons = {}
         from .dialog_manager import DialogManager
-        DialogManager.clear_uid('test')
+        DialogManager.clear_uid(self.uid)
         TestLog.clear()
         TestInterface.clear()
         
@@ -147,7 +150,7 @@ class ConversationTest:
         if isinstance(action, UserMessage):
             from .dialog_manager import DialogManager
             start_time = time.time()
-            dialog = DialogManager(uid='test', interface=TestInterface, test_id=self.name)
+            dialog = DialogManager(uid=self.uid, interface=TestInterface, test_id=self.name, use_logging=not self.benchmark)
             time_init = time.time() - start_time
             start_time = time.time()
             parsed = action.get_parsed()

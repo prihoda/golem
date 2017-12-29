@@ -4,10 +4,11 @@ import time
 from golem.core.persistence import get_elastic
 
 class Logger:
-    def __init__(self, uid, interface, test_id=None):
+    def __init__(self, uid, interface, test_id=None, enabled=True):
         self.uid = uid
         self.test_id = test_id
         self.interface = interface
+        self.enabled = enabled
 
     def log_user_message(self, type_, entities, accepted_time, state):
         #es = get_elastic()
@@ -63,6 +64,8 @@ class Logger:
         self.log_message(message)
 
     def log_message(self, message):
+        if not self.enabled:
+            return
         es = get_elastic()
         if not es:
             return

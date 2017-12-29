@@ -104,21 +104,22 @@ def test(request):
     return HttpResponse(template.render(context, request))
 
 def run_test(request, name):
-    return JsonResponse(data=_run_test_module(name))
+    benchmark = request.GET.get('benchmark', False)
+    return JsonResponse(data=_run_test_module(name, benchmark=benchmark))
 
 def run_test_message(request, message):
     return _run_test_actions('message', [UserTextMessage(message)])
 
-def _run_test_module(name):
+def _run_test_module(name, benchmark=False):
     import importlib
     import imp
 
     module = importlib.import_module('tests.'+name)
     imp.reload(module)
-    return _run_test_actions(name, module.actions)
+    return _run_test_actions(name, module.actions, benchmark=benchmark)
 
-def _run_test_actions(name, actions):
-    test = ConversationTest(name, actions)
+def _run_test_actions(name, actions, benchmark=False):
+    test = ConversationTest(name, actions, benchmark=benchmark)
     start_time = time.time()
     report = None
     try:
