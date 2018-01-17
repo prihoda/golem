@@ -219,8 +219,8 @@ class FacebookInterface():
         raise ValueError('Error: Invalid message type: {}: {}'.format(type(response), response))
 
     @staticmethod
-    def send_settings(settings):
-        for setting in settings:
+    def send_settings(setting_list):
+        for setting in setting_list:
             for page_id in settings.GOLEM_CONFIG.get('FB_PAGE_TOKENS'):
                 FacebookInterface.post_message(FacebookInterface.fbid_to_uid(page_id, 0), setting)
 
