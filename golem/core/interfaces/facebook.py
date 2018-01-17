@@ -222,7 +222,7 @@ class FacebookInterface():
     def send_settings(setting_list):
         for setting in setting_list:
             for page_id in settings.GOLEM_CONFIG.get('FB_PAGE_TOKENS'):
-                FacebookInterface.post_message(FacebookInterface.fbid_to_uid(page_id, 0), setting)
+                FacebookInterface.post_message(FacebookInterface.fbid_to_uid(page_id, ''), setting)
 
     @staticmethod
     def processing_start(uid):
