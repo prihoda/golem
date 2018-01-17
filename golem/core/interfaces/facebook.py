@@ -25,7 +25,7 @@ class FacebookInterface():
                 if diff.total_seconds() < settings.GOLEM_CONFIG.get('MSG_LIMIT_SECONDS'):
                     # print("MSG FB layer GET FB:")
                     print('INCOMING RAW FB MESSAGE: {}'.format(raw_message))
-                    uid = FacebookInterface.fbid_to_uid(raw_message['sender']['id'])
+                    uid = FacebookInterface.fbid_to_uid(entry['id'], raw_message['sender']['id'])
                     # Confirm accepted message
                     FacebookInterface.post_message(uid, SenderActionMessage('mark_seen'))
                     # Add it to the message queue
@@ -36,7 +36,23 @@ class FacebookInterface():
 
     @staticmethod
     def uid_to_fbid(uid):
-        return uid.split('_',maxsplit=1)[1] # uid has format fb_{number}
+        return uid.split('_',maxsplit=2)[2] # uid has format fb_{page_id}_{user_number}
+
+    @staticmethod
+    def uid_to_page_id(uid):
+        return uid.split('_',maxsplit=2)[1] # uid has format fb_{page_id}_{user_number}
+
+    @staticmethod
+    def fbid_to_uid(page_id, fbid):
+         return 'fb_'+page_id+'_'+fbid
+
+    @staticmethod
+    def get_page_token_for_uid(uid):
+        tokens = settings.GOLEM_CONFIG.get('FB_PAGE_TOKENS')
+        page_id = FacebookInterface.uid_to_page_id(uid)
+        if page_id not in tokens:
+            raise Exception('Page id "{}" not in tokens: {}'.format(page_id, tokens))
+        return tokens.get(page_id)
 
     @staticmethod
     def load_profile(uid, cache=True):
@@ -51,7 +67,7 @@ class FacebookInterface():
             url = "https://graph.facebook.com/v2.6/"+fbid
             params = {
                 'fields': 'first_name,last_name,profile_pic,locale,timezone,gender',
-                'access_token': settings.GOLEM_CONFIG.get('FB_PAGE_TOKEN')
+                'access_token': FacebookInterface.get_page_token_for_uid(uid)
             }
             res = requests.get(url, params=params)
             if not res.status_code == requests.codes.ok:
@@ -61,10 +77,6 @@ class FacebookInterface():
             db.set(key, json.dumps(res.json()), ex=3600*24*14) # save value, expire in 14 days
 
         return json.loads(db.get(key).decode('utf-8'))
-
-    @staticmethod
-    def fbid_to_uid(fbid):
-         return 'fb_'+fbid
 
     @staticmethod
     def post_message(uid, response):
@@ -86,7 +98,7 @@ class FacebookInterface():
         else:
             raise ValueError('Error: Invalid message type: {}: {}'.format(type(response), response))
         prefix_post_message_url = 'https://graph.facebook.com/v2.6/me/'
-        token = settings.GOLEM_CONFIG.get('FB_PAGE_TOKEN')
+        token = FacebookInterface.get_page_token_for_uid(uid)
         post_message_url = prefix_post_message_url+request_mode+'?access_token='+token
         # print("POST", post_message_url)
         r = requests.post(post_message_url,
