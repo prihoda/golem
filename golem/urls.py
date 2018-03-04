@@ -21,5 +21,6 @@ urlpatterns = [
     url(r'^debug/?$', views.debug),
     url(r'^test_record/?$', views.test_record),
     url(r'^log_user/(?P<uid>[a-zA-Z_0-9]*)/(?P<page>[0-9]*)/?$', views.log_user),
-    url(r'^nlp/?', nlp_view)
+    url(r'^nlp/?', nlp_view),
+    url(r'^users/?', views.users_view)
 ]

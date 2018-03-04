@@ -13,7 +13,7 @@ from golem.core.persistence import get_redis
 from golem.tasks import accept_user_message
 
 
-class TelegramInterface():
+class TelegramInterface:
     name = 'telegram'
     prefix = 'tg'
 
@@ -27,7 +27,7 @@ class TelegramInterface():
 
     @staticmethod
     def init_webhooks():
-        from django.core.urlresolvers import reverse
+        from django.urls import reverse
 
         base_url = TelegramInterface.get_base_url()
         if not base_url:

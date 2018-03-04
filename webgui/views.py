@@ -16,22 +16,29 @@ def webgui(request):
         uid = request.session['uid']
         if request.method == 'POST':
             # message received via webgui
-            msg = Message()
-            msg.uid = uid
-            msg.text = request.POST.get('message')
-            msg.timestamp = time.time()
-            if msg.text is not None and len(msg.text) > 0:
-                # process message if text != null
-                msg.save()
-                WebGuiInterface.accept_request(msg)
+            if request.POST.get('message'):
+                msg = Message()
+                msg.uid = uid
+                msg.text = request.POST.get('message')
+                msg.timestamp = time.time()
+                if msg.text is not None and len(msg.text) > 0:
+                    # process message if text != null
+                    msg.save()
+                    if request.POST.get("postback"):
+                        WebGuiInterface.accept_postback(msg, request.POST.get("postback"))
+                    else:
+                        WebGuiInterface.accept_request(msg)
+            else:
+                print("Error, message not set in POST")
+                return HttpResponseBadRequest()
             return HttpResponse()
 
         messages = Message.objects.filter(uid=uid).order_by('timestamp')
         context = {
             'uid': uid, 'messages': messages,
             'form': MessageForm, 'timestamp': datetime.now().timestamp(),
-            'user_img': settings.GOLEM_CONFIG.get('WEBGUI_USER_IMAGE', 'images/icon_user.png'),
-            'bot_img': settings.GOLEM_CONFIG.get('WEBGUI_BOT_IMAGE', 'images/icon_robot.png')
+            'user_img': settings.GOLEM_CONFIG.get('WEBGUI_USER_IMAGE'),
+            'bot_img': settings.GOLEM_CONFIG.get('WEBGUI_BOT_IMAGE')
         }
         return render(request, 'index.html', context)
     else:

@@ -1,15 +1,17 @@
 import json
-import os
 import pickle
+import os
 
-from golem.nlp.czech_stemmer import cz_stem
+from django.conf import settings
+
 from golem.nlp.keywords import keyword_search
+from golem.nlp.nn.seq2seq import Seq2Seq
 
-print('Will import SpaCy and TF!')
+print('Will import GloVe and TF!')
 
 import numpy as np
-from golem.nlp import duckling
-from golem.nlp.model import Model
+from golem.nlp import duckling, cleanup
+from golem.nlp.nn.model import Model
 
 from celery.app.log import get_logger
 
@@ -17,12 +19,12 @@ from golem.nlp import utils
 
 logging = get_logger(__name__)
 
-# load stemming only
-nlp = utils.get_spacy()
 glove = utils.get_glove()
-logging.debug('SpaCy and TF imported')
+logging.debug('GloVe and TF imported')
 
 models = {}
+
+NLP_DATA_DIR = utils.data_dir()
 
 
 def get_model(entity, entity_dir) -> Model:
@@ -32,22 +34,6 @@ def get_model(entity, entity_dir) -> Model:
     return models[entity]
 
 
-def cleanup(text, stemming=False):
-    """
-    Tokenizes and stems a sentence.
-    :param text     Text that needs to be tokenized
-    :param stemming Words will be stemmed if true
-    :returns:       List of tokens.
-    """
-    tokens = nlp.tokenizer(text)
-    ignore_words = ['?', '.', '!']
-    if stemming:
-        # nlp.tagger(tokens)
-        return [cz_stem(str(token), aggressive=True) for token in tokens]
-    tokens = [str(token).lower() for token in tokens]
-    return [t for t in tokens if t not in ignore_words]
-
-
 def word2vec(text):
     """
     Converts entity to a vector for tensorflow.
@@ -55,12 +41,14 @@ def word2vec(text):
     :returns    numpy array of features
     """
     features = [np.zeros(glove.get_dimension()) for x in range(10)]
-    for idx, word in enumerate(cleanup(text)):
+    clean_text = cleanup.tokenize(text, stemming=False, language="cz")
+    print("Tokens:", clean_text)
+    for idx, word in enumerate(clean_text):
         if idx > 10:
             logging.warning('Message too long!')  # FIXME allow longer messages
         vec = glove.get_vector(word)
         if vec is not None:
-            features[idx] = vec * 1000
+            features[idx] = vec
     return np.array([features])
 
 
@@ -69,7 +57,7 @@ def classify_trait(text, entity, threshold):
     Classifies entity with a neural network.
     :returns:   Predicted label from tensorflow.
     """
-    entity_dir = os.path.join(os.environ['NLP_DATA_DIR'], 'model', entity)
+    entity_dir = os.path.join(NLP_DATA_DIR, 'model', entity)
     pickle_data = pickle.load(open(os.path.join(entity_dir, 'pickle.json'), 'rb'))
     x, y = pickle_data['x'], pickle_data['y']
     words, classes = pickle_data['words'], pickle_data['classes']
@@ -93,31 +81,6 @@ def classify_trait(text, entity, threshold):
     return None
 
 
-def classify_keywords(text, entity, should_stem=False):
-    """
-    Classifies entity using a list of keywords.
-    :returns:   Predicted keyword.
-    """
-    # FIXME ADD METADATA !!!
-    matches = []
-    words = set(cleanup(text, should_stem))
-    entity_dir = os.path.join(os.environ['NLP_DATA_DIR'], 'model', entity)
-    with open(os.path.join(entity_dir, 'keywords.json'), 'r') as f:
-        keywords = json.load(f)
-    for idx, keyword in enumerate(keywords):
-        kw = set(cleanup(keyword['value']))
-        if words & kw == kw:
-            data = {}
-            if 'label' in keyword:
-                data['value'] = keyword['label']
-            else:
-                data['value'] = keyword['value']
-            if 'metadata' in keyword:
-                data['metadata'] = keyword['metadata']
-            matches.append(data)
-    return matches
-
-
 def classify(text: str, current_state=None):
     """
     Classifies all entity values of a text input.
@@ -126,8 +89,15 @@ def classify(text: str, current_state=None):
     :returns:   Dict containing found entities.
     """
     output = {}
-    model_dir = os.path.join(os.environ['NLP_DATA_DIR'], 'model')
+    model_dir = os.path.join(NLP_DATA_DIR, 'model')
     dirs = [i for i in os.scandir(model_dir) if i.is_dir()]
+
+    from golem.nlp import geneea
+    try:
+        text = geneea.get_correction(text)
+        sentiment = geneea.get_sentiment(text)
+    except:
+        sentiment = 0.0
 
     for dir in dirs:
         # search in text for each known entity
@@ -147,24 +117,32 @@ def classify(text: str, current_state=None):
             if pred:
                 output[entity] = pred
         elif metadata['strategy'] == 'keywords':
+            import unidecode
             with open(os.path.join(entity_dir, "trie.json"), 'r') as g:
                 trie = json.load(g)
             should_stem = metadata.get('stemming', False)
             language = metadata.get('language', utils.get_default_language())
-            pred = keyword_search(text, trie, should_stem, language)
+            pred = keyword_search(unidecode.unidecode(text), trie, should_stem, language)
             if pred:
                 output[entity] = pred
+        elif metadata['strategy'] == 'seq2seq':
+            model = models.setdefault(entity, Seq2Seq(entity, entity_dir))
+            pred = model.predict(text)
+            if pred:
+                output[entity] = [{'value': pred}]
         else:
-            logging.warning('Unknown search strategy {} for entity {}, skipping!' \
+            logging.warning('Unknown search strategy {} for entity {}, skipping!'
                             .format(metadata['strategy'], entity))
 
+    if sentiment:
+        output['sentiment'] = [{"value": sentiment}]
     output.update(duckling.get(text))
     logging.debug(output)
     return output
 
 
 def test_all():
-    test_dir = os.path.join(os.environ['NLP_DATA_DIR'], 'testing_data')
+    test_dir = os.path.join(NLP_DATA_DIR, 'testing_data')
     entities = []
     for f in os.scandir(test_dir):
         name, ext = os.path.splitext(f.name)
@@ -173,13 +151,17 @@ def test_all():
     for entity, filename in entities:
         with open(filename) as f:
             examples = json.load(f).items()
-            model_dir = os.path.join(os.environ['NLP_DATA_DIR'], 'model', entity)
+            model_dir = os.path.join(NLP_DATA_DIR, 'model', entity)
             model = get_model(entity, model_dir)
             pickle_data = pickle.load(open(os.path.join(model_dir, 'pickle.json'), 'rb'))
             classes = pickle_data['classes']
             x = [word2vec(text) for text, label in examples]
-            y = [classes.index(label) for text, label in examples]
+            for text, label in examples:
+                print(text, label)
+            y = [classes.index(label) if label is not None else -1 for text, label in examples]
             scores, predictions = model.test(x, y)
-            for example, score, pred in zip(examples, scores, predictions):
-                if abs(score - 0.0) < 1e-4:
-                    print("Wrong label for '{}': '{}' expected: '{}'".format(example[0], classes[pred], example[1]))
+            for example, score_vec in zip(examples, scores):
+                is_ok, score, pred = score_vec
+                if not is_ok:
+                    prediction = classes[pred] if score > 0.5 else None
+                    print("Wrong label for '{}': '{}' expected: '{}'".format(example[0], prediction, example[1]))

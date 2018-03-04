@@ -45,7 +45,7 @@ class LinkButton(Button):
     A button that opens a website when clicked.
     """
 
-    def __init__(self, title, url, webview=True):
+    def __init__(self, title, url, webview=False):
         super(Button, self).__init__()
         self.title = title
         self.url = url

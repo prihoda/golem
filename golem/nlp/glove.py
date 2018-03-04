@@ -2,6 +2,9 @@ import logging
 import os
 
 import numpy as np
+import random
+
+import time
 
 
 class GloVe:
@@ -21,6 +24,7 @@ class GloVe:
         self.offsets = {}
         self.use_weights = False
         self.weights = []
+        # self.reader = None
         if not self.load_from_cache():
             self.load()
             self.create_word_cache()
@@ -62,6 +66,7 @@ class GloVe:
 
     def load(self):
         logging.info('Loading GloVe')
+
         with open(self.files[0], 'r') as stream:
             for idx, line in enumerate(stream):
                 word = line.split()[0]
@@ -74,6 +79,15 @@ class GloVe:
                     self.offsets[word].append(offset)
                     offset = stream.tell()
                     line = stream.readline()
+
+        # try:
+        #     import simstring
+        #     db = simstring.writer(os.path.join(self.dir, 'simstring.db'))
+        #     for word in list(self.offsets.keys()):
+        #         db.insert(word)
+        #     db.close()
+        # except:
+        #     logging.warning("Simstring not found, approximate matching will not work.")
 
         word_cnt = len(self.offsets)
         self.weights = self.compute_variances()
@@ -89,13 +103,18 @@ class GloVe:
                 dim += len(arr) - 1
         return dim
 
-    def get_vector(self, word):
+    def get_vector(self, word, nearest_match=False):
         """
         Loads vector representation of a word.
         Time complexity O(1) with respect to number of words.
         :param  word
         :returns:   numpy.array on success, None otherwise.
         """
+        if word not in self.offsets and nearest_match:
+            word = self.get_nearest_match(word)
+        if word not in self.offsets:
+            return None
+            #word = '########'  # FIXME use <unk>, which I don't have in the embedding right now
         if word in self.offsets:
             vec = []
             for file_idx, filename in enumerate(self.files):
@@ -181,3 +200,39 @@ class GloVe:
             if v is not None:
                 vec.append(v)
         return np.mean(vec, axis=0)
+
+    def random_word(self):
+        """Returns a randomly chosen word from this embedding."""
+        return random.choice(list(self.offsets.keys()))
+
+    # def simstring_reader(self):
+    #     if self.reader != None:
+    #         return self.reader
+    #     elif os.path.exists(os.path.join(self.dir, 'simstring.db')):
+    #         try:
+    #             logging.debug("Loading simstring reader")
+    #             import simstring
+    #             db = simstring.reader(os.path.join(self.dir, 'simstring.db'))
+    #             db.measure = simstring.cosine
+    #             db.threshold = 0.2
+    #             self.reader = db
+    #             return db
+    #         except ImportError:
+    #             logging.warning("Simstring not found, nearest match not available")
+    #     return None
+
+    def get_nearest_match(self, word):
+        logging.warning("Using nearest match")
+
+        if not word:
+            return None
+
+        t = time.time()
+        from golem.nlp.tools import correct
+        match = correct.nearest_word(word, self)
+        t = time.time() - t
+        logging.warning("Nearest match: {} time: {} s".format(match, t))
+        return match
+
+    def contains(self, word):
+        return self.offsets.get(word) != None

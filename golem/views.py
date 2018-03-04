@@ -5,6 +5,7 @@ import traceback
 
 from django.conf import settings
 from django.http.response import HttpResponse, JsonResponse
+from django.shortcuts import render
 from django.template import loader
 from django.utils.decorators import method_decorator
 from django.views import generic
@@ -255,3 +256,12 @@ def debug(request):
     FacebookInterface.accept_request({'entry':[{'messaging':[{'message': {'seq': 356950, 'mid': 'mid.$cAAPhQrFuNkFibcXMZ1cPICEB8YUn', 'text': 'hi'}, 'recipient': {'id': '1092102107505462'}, 'timestamp': 1595663674471, 'sender': {'id': '1046728978756975'}}]}]})
 
     return HttpResponse('done')
+
+
+def users_view(request):
+    from golem.models import User
+    offset = int(request.GET.get("offset", 0))
+    limit = int(request.GET.get("limit", 50))
+    users = User.objects.all().order_by("uid")[offset:limit + offset]
+    context = {"users": users, "next_offset": offset + limit, "prev_offset": offset - limit}
+    return render(request, "golem/users.html", context)

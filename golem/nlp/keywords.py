@@ -78,7 +78,6 @@ def keyword_search(text, trie, should_stem=False, language='en') -> list:
             outputs.sort(key=lambda x: len(x.get('requires', [])), reverse=True)
             following = set(words[idx + 1:])
             for output in outputs:
-                print(output.get('requires'))
                 required = set(output.get('requires', []))
                 if required & following == required:
                     extracted.append({

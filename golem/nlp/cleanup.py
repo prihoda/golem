@@ -1,5 +1,13 @@
-from golem.nlp import utils
-from golem.nlp.czech_stemmer import cz_stem
+from golem.nlp.tools.czech_stemmer import cz_stem_all
+from golem.nlp.tools.porter2 import Stemmer
+from golem.nlp.tools.toktok import ToktokTokenizer
+
+tokenizer = ToktokTokenizer()
+
+stemmers = {
+    "en": Stemmer("en").stemWords,
+    "cz": cz_stem_all
+}
 
 
 def tokenize(text: str, stemming=False, language='en'):
@@ -8,14 +16,13 @@ def tokenize(text: str, stemming=False, language='en'):
     :param text:        Text to be tokenized.
     :param stemming:    Boolean, enables stemming.
                         Default is false.
-    :param language:    Stemming language. Default is cz.
+    :param language:    Stemming language. Default is 'en'.
     :return:
     """
-    tokens = utils.get_spacy().tokenizer(text)
+    tokens = tokenizer.tokenize(text)
     if stemming:
-        if language == 'cz':
-            return [cz_stem(str(token), aggressive=True).lower() for token in tokens]
-        elif language == 'en':
-            utils.get_spacy().tagger(tokens)
-            return [str(token.lemma_).lower() for token in tokens]
+        stemmer = stemmers.get(language)
+        if not stemmer:
+            raise Exception("No known stemmer for language {}!".format(language))
+        tokens = [s.lower() for s in stemmer(tokens)]
     return [str(token).lower() for token in tokens]

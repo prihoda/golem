@@ -13,7 +13,7 @@ class ListTemplate(MessageElement):
 
     def add_element(self, element: GenericTemplateElement):
         self.elements.append(element)
-        return element
+        return self
 
     def create_element(self, **kwargs):
         element = GenericTemplateElement(**kwargs)

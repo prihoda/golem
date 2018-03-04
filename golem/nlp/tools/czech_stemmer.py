@@ -1,5 +1,5 @@
 #! /usr/bin/env python3.1
-''' Czech stemmer
+""" Czech stemmer
 Copyright © 2010 Luís Gomes <luismsgomes@gmail.com>.
 This code is released under a Creative Commons Attribution 3.0 Unported License.
 https://creativecommons.org/licenses/by/3.0/
@@ -7,12 +7,16 @@ https://creativecommons.org/licenses/by/3.0/
 Ported from the Java implementation available at:
     http://members.unine.ch/jacques.savoy/clef/index.html
 
-'''
+"""
 import re
 import sys
 
 
 ### FIXME VALIDATE SLOVAK CHARACTERS !!! ###
+
+def cz_stem_all(words, aggressive=True):
+    return [cz_stem(word, aggressive) for word in words]
+
 
 def cz_stem(word, aggressive=False):
     if not re.match("^\\w+$", word):
@@ -169,12 +173,3 @@ def _palatalise(word):
     if word[-3:] in {"ště", "šti", "ští"}:
         return word[:-3] + "sk"
     return word[:-1]
-
-
-if __name__ == '__main__':
-    if len(sys.argv) != 2 or sys.argv[1] not in ("light", "aggressive"):
-        sys.exit("usage: {} light|aggressive".format(sys.argv[0]))
-    aggressive = sys.argv[1] == "aggressive"
-    for line in sys.stdin:
-        print(*[cz_stem(word, aggressive=aggressive)
-                for word in line.split()])

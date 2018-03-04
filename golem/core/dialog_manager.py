@@ -6,6 +6,7 @@ import importlib
 import re
 from django.conf import settings
 
+from golem.core import message_logger
 from golem.core.responses.responses import TextMessage
 from golem.tasks import accept_inactivity_callback, accept_schedule_callback
 from .context import Context
@@ -27,7 +28,10 @@ class DialogManager:
         self.profile = interface.load_profile(local_id(uid))
         self.db = get_redis()
         self.log = logging.getLogger()
-        
+
+        self.should_log_messages = settings.GOLEM_CONFIG.get('should_log_messages', False)
+        self.error_message_text = settings.GOLEM_CONFIG.get('error_message_text', 'Oh no! You broke me! :(')
+
         entities = {}
         version = self.db.get('dialog_version')
         self.log.info('Initializing dialog for user %s...' % uid)
@@ -161,7 +165,7 @@ class DialogManager:
         if not state.accept:
             self.log.warn('State does not have an ACCEPT action, we are done.')
             return
-        response, new_state_name = state.accept(state=state)
+        response, new_state_name = state.accept(state=state)  # FIXME <-- don't crash on invalid return value (not iterable)
         self.send_response(response)
         self.move_to(new_state_name, save_identical=save_identical)
 
@@ -267,7 +271,7 @@ class DialogManager:
                 except:
                     pass
                 logging.exception('Exception follows')
-                self.send_response([TextMessage('Internal error :-(((')])
+                self.send_response([TextMessage(self.error_message_text)])
 
         self.save_state()
         return True
@@ -307,6 +311,10 @@ class DialogManager:
             # Log the response
             self.log.info('Message: {}'.format(response))
             self.logger.log_bot_message(response, self.current_state_name)
+
+            text = response.text if hasattr(response, 'text') else (response if isinstance(response, str) else None)
+            if text and self.should_log_messages:
+                message_logger.on_message.delay(self.uid, self.chat_id, text, self, from_user=False)
 
 
 def local_id(id):

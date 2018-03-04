@@ -4,9 +4,8 @@ import os
 import requests
 from django.conf import settings
 
-duckling_url = settings.GOLEM_CONFIG.get('DUCKLING_URL')
-language = settings.GOLEM_CONFIG.get('DUCKLING_LANGUAGE', 'en_US')
-
+duckling_url = settings.NLP_CONFIG.get('DUCKLING_URL')
+language = settings.NLP_CONFIG.get('DUCKLING_LANGUAGE', 'en_US')
 
 def get(text):
     """

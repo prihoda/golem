@@ -1,4 +1,7 @@
-class MenuElement():
+from typing import Iterable
+
+
+class MenuElement:
     def __init__(self, type, title, payload=None, url=None,
                  webview_height_ratio=None, messenger_extensions=None):
         self.type = type
@@ -84,18 +87,35 @@ class TextMessage(MessageElement):
         if self.quick_replies:
             raise ValueError('Cannot add quick_replies and buttons to the same message')
         self.buttons.append(button)
-        return button
+        return self
+
+    def add_reply(self, quick_reply):
+        return self.add_quick_reply(quick_reply)
 
     def add_quick_reply(self, quick_reply):
         if self.buttons:
             raise ValueError('Cannot add quick_replies and buttons to the same message')
+        elif isinstance(quick_reply, str):
+            from golem.core.responses.quick_reply import QuickReply
+            quick_reply = QuickReply(title=quick_reply)
+
         self.quick_replies.append(quick_reply)
-        return quick_reply
+        return self
 
     def create_quick_reply(self, **kwargs):
         from .quick_reply import QuickReply
         quick_reply = QuickReply(**kwargs)
         return self.add_quick_reply(quick_reply)
+
+    def with_replies(self, replies: Iterable):
+        for reply in replies:
+            self.add_quick_reply(reply)
+        return self
+
+    def with_buttons(self, buttons: Iterable):
+        for button in buttons:
+            self.add_button(button)
+        return self
 
 
 class GenericTemplateMessage(MessageElement):
@@ -125,7 +145,7 @@ class GenericTemplateMessage(MessageElement):
 
     def add_element(self, element):
         self.elements.append(element)
-        return element
+        return self
 
     def create_element(self, **kwargs):
         element = GenericTemplateElement(**kwargs)
@@ -159,15 +179,23 @@ class AttachmentMessage(MessageElement):
 #        }
 
 
+def _ellipsize(text, max_len=80):
+    if text is None:
+        return None
+    if len(text) >= max_len:
+        return text[:max_len-5] + "..."
+    return text
+
+
 class GenericTemplateElement(MessageElement):
     """
     A horizontal card view with title, subtitle, image and buttons.
     """
 
     def __init__(self, title, image_url=None, subtitle=None, item_url=None, buttons=None):
-        self.title = title
+        self.title = _ellipsize(str(title)) if title else None
+        self.subtitle = _ellipsize(str(subtitle)) if subtitle else None
         self.image_url = image_url
-        self.subtitle = subtitle
         self.item_url = item_url
         self.buttons = buttons if buttons else []
 
@@ -192,7 +220,7 @@ class GenericTemplateElement(MessageElement):
 
     def add_button(self, button):
         self.buttons.append(button)
-        return button
+        return self
 
 
 def _get_payload_string(payload):

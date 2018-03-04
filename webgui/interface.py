@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 import time
@@ -5,6 +6,7 @@ import time
 from django.db import OperationalError
 
 from golem.core.message_parser import parse_text_message
+from golem.core.responses.buttons import PayloadButton
 from golem.core.responses.quick_reply import LocationQuickReply
 from golem.tasks import accept_user_message
 from .models import Message, Button, Element
@@ -46,7 +48,9 @@ class WebGuiInterface:
                 if hasattr(btn, 'url'):
                     b.action = 'link'
                     b.url = btn.url
-                # TODO postbacks
+                elif isinstance(btn, PayloadButton):
+                    b.action = "postback"
+                    b.url = btn.payload
                 # todo parse stuff
                 b.save()
 
@@ -96,12 +100,28 @@ class WebGuiInterface:
     @staticmethod
     def parse_message(user_message, num_tries=1):
         logging.info('[WEBGUI] @ parse_message')
-        return parse_text_message(user_message)
+        if user_message.get('text'):
+            return parse_text_message(user_message.get('text'))
+        elif user_message.get("payload"):
+            data = user_message.get("payload")
+            logging.info("Payload is: {}".format(data))
+            if isinstance(data, dict):
+                return {'entities': data, 'type': 'postback'}
+            else:
+                from golem.core.serialize import json_deserialize
+                payload = json.loads(data, object_hook=json_deserialize)
+                payload['_message_text'] = [{'value': None}]
+                return {'entities': payload, 'type': 'postback'}
 
     @staticmethod
     def accept_request(msg: Message):
         logging.info('[WEBGUI] Received message from {}'.format(str(msg.uid)))
-        accept_user_message.delay('webgui', 'web_' + str(msg.uid), msg.text)
+        accept_user_message.delay('webgui', 'web_' + str(msg.uid), {"text": msg.text})
+
+    @staticmethod
+    def accept_postback(msg: Message, data):
+        logging.info('[WEBGUI] Received postback from {}'.format(str(msg.uid)))
+        accept_user_message.delay('webgui', 'web_' + str(msg.uid), {"payload": data})
 
     @staticmethod
     def make_uid(username) -> str:

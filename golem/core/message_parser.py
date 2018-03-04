@@ -66,8 +66,7 @@ def parse_with_nlp(text):
 
 def parse_text_message(text, num_tries=1):
     wit_token = settings.GOLEM_CONFIG.get('WIT_TOKEN')
-    nlp_data_dir = settings.GOLEM_CONFIG.get('NLP_DATA_DIR')
-    if not wit_token and not nlp_data_dir:
+    if not wit_token and not hasattr(settings, "NLP_CONFIG"):
         print('No NLP engines configured!')
         return {'type':'message','entities': {'_message_text' : {'value':text}}}
 
@@ -81,7 +80,7 @@ def parse_text_message(text, num_tries=1):
             print('Got cached wit key: "{}" = {}'.format(cache_key, parsed))
             return parsed
 
-    if nlp_data_dir:
+    if hasattr(settings, "NLP_CONFIG"):
         wit_parsed = parse_with_nlp(text)
     elif wit_token:
         wit_parsed = parse_with_wit(text, wit_token)

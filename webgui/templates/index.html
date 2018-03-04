@@ -13,48 +13,51 @@
 <div id="list_wrap">
     <div id="list">
         {% for m in messages %}
-        <div class="message_container" style="float: {% if m.is_response %} left {% else %} right {% endif %};">
-            {% if m.is_response %}
-            <img class="circle-image" src="{% static bot_img %}"/> {% endif %}
-            <div class="msg" style="text-align: {% if m.is_response %} left {% else %} right {% endif %}">
-                <div class="bubble"><span class="text">{{ m.text }}</span></div>
+            <div class="message_container" style="float: {% if m.is_response %} left {% else %} right {% endif %};">
+                {% if m.is_response %}
+                    <img class="circle-image" src="{% static bot_img %}"/> {% endif %}
+                <div class="msg" style="text-align: {% if m.is_response %} left {% else %} right {% endif %}">
+                    <div class="bubble"><span class="text">{{ m.text }}</span></div>
 
-                <div class="msg_elements">
-                    {% for e in m.get_elements %}
-                    <div class="element">
-                        <img src="{{ e.image_url }}"
-                             onerror="this.onerror=null;this.src='https://placehold.it/300x300'"/>
-                        <h3 class="element_txt">{{ e.title }}</h3>
-                        <!--<h4 class="element_txt">{{ e.subtitle }}</h4>-->
-                        {% for b in e.buttons %}
-                        <button>{{ b.text }}</button>
+                    <div class="msg_elements">
+                        {% for e in m.get_elements %}
+                            <div class="element">
+                                <img src="{{ e.image_url }}"
+                                     onerror="this.onerror=null;this.src='https://placehold.it/300x300'"/>
+                                <h3 class="element_txt">{{ e.title }}</h3>
+                                <p>{{ e.subtitle }}</p>
+                                {% for b in e.buttons %}
+                                    <button>{{ b.text }}</button>
+                                {% endfor %}
+                            </div>
                         {% endfor %}
                     </div>
-                    {% endfor %}
+                    <div class="msg_buttons">
+                        {% for b in m.get_buttons %}
+                            {% if b.action == 'link' %}
+                                <button class="msg_btn" onclick="gourl('{{ b.url }}')">{{ b.text }}</button>
+                            {% elif b.action == 'reply' %}
+                                <button class="msg_btn" onclick="quickreply('{{ b.text }}')">{{ b.text }}</button>
+                            {% elif b.action == 'postback' %}
+                                <button class="msg_btn"
+                                        onclick="postback('{{ b.text }}', {{ b.url }})">{{ b.text }}</button>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
                 </div>
-                <div class="msg_buttons">
-                    {% for b in m.get_buttons %}
-                    {% if b.action == 'link' %}
-                    <button class="msg_btn" onclick="gourl('{{ b.url }}')">{{ b.text }}</button>
-                    {% elif b.action == 'reply' %}
-                    <button class="msg_btn" onclick="quickreply('{{ b.text }}')">{{ b.text }}</button>
-                    {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
-            <span class="time"
-                  style="float: {% if m.is_response %} right {% else %} left {% endif %};">[{{ m.get_time }}]</span>
-            {% if not m.is_response %}
-            <img class="circle-image" src="{% static user_img %}"/> {% endif %}
+                <span class="time"
+                      style="float: {% if m.is_response %} right {% else %} left {% endif %};">[{{ m.get_time }}]</span>
+                {% if not m.is_response %}
+                    <img class="circle-image" src="{% static user_img %}"/> {% endif %}
         </div>
         {% endfor %}
     </div>
 </div>
 <div id="footer">
     <form id="form_msg">
-        {% csrf_token %}
-        {{ form }}
-        <input type="submit" value="Send">
+    {% csrf_token %}
+    {{ form }}
+    <input type="submit" value="Send">
 </form>
 </div>
 </body>
@@ -63,19 +66,33 @@
 
 <script type="text/javascript">
     function quickreply(text) {
+        console.log("Quick reply");
+        $.ajax({
+                url: document.URL,
+                type: 'POST',
+                dataType: 'json',
+                data: {
+                    message: text,
+                    csrfmiddlewaretoken: document.getElementsByName('csrfmiddlewaretoken')[0].value
+                }
+            });
+    }
+    function gourl(url) {
+        window.open(url, '_blank');
+    }
+
+    function postback(text, payload) {
+        console.log("Postback");
         $.ajax({
             url: document.URL,
             type: 'POST',
             dataType: 'json',
             data: {
                 message: text,
+                postback: JSON.stringify(payload),
                 csrfmiddlewaretoken: document.getElementsByName('csrfmiddlewaretoken')[0].value
             }
         });
-    }
-
-    function gourl(url) {
-        window.open(url, '_blank');
     }
 </script>
 
@@ -99,12 +116,7 @@
 </script>
 
 <script type="text/javascript">
-    var timestamp = {
-    {
-        timestamp
-    }
-    }
-    ;
+    var timestamp = {{ timestamp }};
     $(window).load(function() {
         $("#list_wrap").scrollTop($("#list_wrap").prop("scrollHeight"));
         setTimeout(refresh, 2000);
@@ -125,9 +137,7 @@
     }
 
     function logout() {
-        window.location = '{% url '
-        do_logout
-        ' %}'
+        window.location = '{% url 'do_logout' %}'
     }
 </script>
 
@@ -226,12 +236,7 @@
         border-radius: 100%;
         position: relative;
         display: inline;
-
-    {
-        # background-color: #eaeaea
-    ;
-        #
-    }
+    {#        background-color: #eaeaea;#}
     }
 
     .msg {
@@ -254,12 +259,7 @@
         padding: 8px;
         border-radius: 20px;
         z-index: 0;
-
-    {
-        # line-height: 200%
-    ;
-        TODO add this it looks cool #
-    }
+    {#        line-height: 200%; TODO add this it looks cool #}
     }
 
     .msg + .time {
@@ -303,6 +303,13 @@
         margin-right: 20%;
         height: 150px;
         width: auto;
+    }
+
+    .element > p {
+        padding-left: auto;
+        padding-right: auto;
+        text-align: center;
+        color: #777777;
     }
 
     .element_txt {
