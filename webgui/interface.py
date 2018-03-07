@@ -1,10 +1,10 @@
 import json
 import logging
-import random
 import time
 
-from django.db import OperationalError
+import random
 
+from golem.core.chat_session import ChatSession
 from golem.core.message_parser import parse_text_message
 from golem.core.responses.buttons import PayloadButton
 from golem.core.responses.quick_reply import LocationQuickReply
@@ -28,8 +28,8 @@ class WebGuiInterface:
         return {'first_name': 'Tests', 'last_name': ''}
 
     @staticmethod
-    def post_message(uid, chat_id, response):
-        uid = uid.split('_', 1)[1]
+    def post_message(session, response):
+        uid = session.meta.get("uid")
         WebGuiInterface.messages.append(response)
         message = Message()
         message.uid = uid
@@ -85,11 +85,11 @@ class WebGuiInterface:
         pass
 
     @staticmethod
-    def processing_start(uid, chat_id):
+    def processing_start(session):
         pass
 
     @staticmethod
-    def processing_end(uid, chat_id):
+    def processing_end(session):
         pass
 
     @staticmethod
@@ -115,13 +115,17 @@ class WebGuiInterface:
 
     @staticmethod
     def accept_request(msg: Message):
-        logging.info('[WEBGUI] Received message from {}'.format(str(msg.uid)))
-        accept_user_message.delay('webgui', 'web_' + str(msg.uid), {"text": msg.text})
+        uid = str(msg.uid)
+        logging.info('[WEBGUI] Received message from {}'.format(uid))
+        session = ChatSession(WebGuiInterface, uid, meta={"uid": uid})
+        accept_user_message.delay(session.to_json(), {"text": msg.text})
 
     @staticmethod
     def accept_postback(msg: Message, data):
-        logging.info('[WEBGUI] Received postback from {}'.format(str(msg.uid)))
-        accept_user_message.delay('webgui', 'web_' + str(msg.uid), {"payload": data})
+        uid = str(msg.uid)
+        logging.info('[WEBGUI] Received postback from {}'.format(uid))
+        session = ChatSession(WebGuiInterface, uid, meta={"uid": uid})
+        accept_user_message.delay(session.to_json(), {"payload": data})
 
     @staticmethod
     def make_uid(username) -> str:

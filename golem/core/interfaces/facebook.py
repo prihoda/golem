@@ -4,6 +4,7 @@ import logging
 import requests
 from django.conf import settings
 
+from golem.core.chat_session import ChatSession
 from golem.core.message_parser import parse_text_message
 from golem.core.persistence import get_redis
 from golem.core.responses.buttons import *
@@ -30,35 +31,34 @@ class FacebookInterface():
                 ts_datetime = datetime.datetime.fromtimestamp(int(raw_message['timestamp']) / 1000)
                 crr_datetime = datetime.datetime.utcnow()
                 diff = crr_datetime - ts_datetime
-                if diff.total_seconds() < settings.GOLEM_CONFIG.get('MSG_LIMIT_SECONDS'):
-                    # print("MSG FB layer GET FB:")
+                if diff.total_seconds() < settings.GOLEM_CONFIG.get('MSG_LIMIT_SECONDS', 15):
+                    # get and persist user and page ids
                     print('INCOMING RAW FB MESSAGE: {}'.format(raw_message))
-                    uid = FacebookInterface.fbid_to_uid(entry['id'], raw_message['sender']['id'])
-                    uid = raw_message['sender']['id']
+                    user_id = raw_message['sender']['id']
+                    page_id = entry['id']
+                    chat_id = FacebookInterface.create_chat_id(page_id, user_id)
+                    meta = {"user_id": user_id, "page_id": page_id}
+                    # TODO profile
+                    session = ChatSession(FacebookInterface, chat_id, meta=meta)
                     # Confirm accepted message
-                    FacebookInterface.post_message(uid, uid, SenderActionMessage('mark_seen'))
+                    FacebookInterface.post_message(session, SenderActionMessage('mark_seen'))
                     # Add it to the message queue
-                    accept_user_message.delay('facebook', uid, raw_message)
+                    accept_user_message.delay(session.to_json(), raw_message)
                 elif raw_message.get('timestamp'):
                     print("Delay {} too big, ignoring message!".format(diff))
                     print(raw_message)
 
     @staticmethod
-    def uid_to_fbid(uid):
-        return uid.split('_',maxsplit=2)[2] # uid has format fb_{page_id}_{user_number}
+    def chat_id_to_page_id(chat_id):
+        return chat_id.split('_', maxsplit=1)[0]
 
     @staticmethod
-    def uid_to_page_id(uid):
-        return uid.split('_',maxsplit=2)[1] # uid has format fb_{page_id}_{user_number}
+    def create_chat_id(page_id, fbid):
+        return "{}_{}".format(page_id, fbid)
 
     @staticmethod
-    def fbid_to_uid(page_id, fbid):
-         return 'fb_'+page_id+'_'+fbid
-
-    @staticmethod
-    def get_page_token_for_uid(uid):
+    def get_page_token(page_id):
         tokens = settings.GOLEM_CONFIG.get('FB_PAGE_TOKENS')
-        page_id = FacebookInterface.uid_to_page_id(uid)
         if page_id not in tokens:
             raise Exception('Page id "{}" not in tokens: {}'.format(page_id, tokens))
         return tokens.get(page_id)
@@ -75,42 +75,53 @@ class FacebookInterface():
             url = "https://graph.facebook.com/v2.6/" + uid
             params = {
                 'fields': 'first_name,last_name,profile_pic,locale,timezone,gender',
-                'access_token': FacebookInterface.get_page_token_for_uid(uid)
+                'access_token': FacebookInterface.get_page_token(uid)  # FIXME
             }
             res = requests.get(url, params=params)
             if not res.status_code == requests.codes.ok:
-                print("!!!!!!!!!!!!!!!!!!!!!!! ERROR load_profile "+res.status_code)
+                print("!!!!!!!!!!!!!!!!!!!!!!! ERROR load_profile " + res.status_code)
                 return None
 
-            db.set(key, json.dumps(res.json()), ex=3600*24*14) # save value, expire in 14 days
+            db.set(key, json.dumps(res.json()), ex=3600 * 24 * 14)  # save value, expire in 14 days
 
         return json.loads(db.get(key).decode('utf-8'))
 
-
     @staticmethod
-    def post_message(uid, chat_id, response):
+    def post_message(session: ChatSession, response):
+        fbid = session.meta.get("fbid")
+        page_id = session.meta.get("page_id")
 
         if isinstance(response, SenderActionMessage):
             request_mode = "messages"
-            response_dict = {'sender_action': response.action, 'recipient': {"id": uid}}
+            response_dict = {'sender_action': response.action, 'recipient': {"id": fbid}}
         elif isinstance(response, MessageElement):
             message = FacebookInterface.to_message(response)
-            response_dict = {"recipient": {"id": uid}, "message": message}
+            response_dict = {"recipient": {"id": fbid}, "message": message}
             request_mode = "messages"
-        elif isinstance(response, ThreadSetting):
-            request_mode = "thread_settings"
-            response_dict = FacebookInterface.to_setting(response)
-            print('SENDING SETTING:', response_dict)
         else:
             raise ValueError('Error: Invalid message type: {}: {}'.format(type(response), response))
 
+        FacebookInterface._do_post(request_mode, response_dict, page_id)
+
+    @staticmethod
+    def post_setting(page_id, response):
+        if isinstance(response, ThreadSetting):
+            request_mode = "thread_settings"
+            response_dict = FacebookInterface.to_setting(response)
+            print('SENDING SETTING:', response_dict)
+            FacebookInterface._do_post(request_mode, response_dict, page_id)
+        else:
+            raise ValueError('Error: Invalid message type: {}: {}'.format(type(response), response))
+
+    @staticmethod
+    def _do_post(request_mode, response_dict, page_id):
         prefix_post_message_url = 'https://graph.facebook.com/v2.6/me/'
-        token = FacebookInterface.get_page_token_for_uid(uid)
-        post_message_url = prefix_post_message_url+request_mode+'?access_token='+token
-        # print("POST", post_message_url)
+        token = FacebookInterface.get_page_token(page_id)
+        post_message_url = prefix_post_message_url + request_mode + '?access_token=' + token
+
         r = requests.post(post_message_url,
-                               headers={"Content-Type": "application/json"},
-                               data=json.dumps(response_dict, default=json_serialize))
+                          headers={"Content-Type": "application/json"},
+                          data=json.dumps(response_dict, default=json_serialize))
         if r.status_code != 200:
             logging.error('ERROR: MESSAGE REFUSED: {}'.format(response_dict))
             logging.error('ERROR: {}'.format(r.text))
@@ -120,12 +131,12 @@ class FacebookInterface():
     def to_setting(response):
         if isinstance(response, GreetingSetting):
             return {
-                "greeting": {'text' : response.message},
+                "greeting": {'text': response.message},
                 "setting_type": "greeting"
             }
         elif isinstance(response, GetStartedSetting):
             return {
-                "call_to_actions": [{'payload' : json.dumps(response.payload, default=json_serialize)}],
+                "call_to_actions": [{'payload': json.dumps(response.payload, default=json_serialize)}],
                 "setting_type": "call_to_actions",
                 "thread_state": "new_thread"
             }
@@ -152,37 +163,37 @@ class FacebookInterface():
         if isinstance(response, TextMessage):
             if response.buttons:
                 return {
-                    "attachment":{
-                       "type":"template",
-                       "payload":{
-                         "template_type":"button",
-                         "text": response.text[:FacebookInterface.TEXT_LENGTH_LIMIT],
-                         "buttons": [FacebookInterface.to_message(button) for button in response.buttons]
-                       }
+                    "attachment": {
+                        "type": "template",
+                        "payload": {
+                            "template_type": "button",
+                            "text": response.text[:FacebookInterface.TEXT_LENGTH_LIMIT],
+                            "buttons": [FacebookInterface.to_message(button) for button in response.buttons]
+                        }
                     }
-                  }
-            message = {'text' : response.text[:FacebookInterface.TEXT_LENGTH_LIMIT]}
+                }
+            message = {'text': response.text[:FacebookInterface.TEXT_LENGTH_LIMIT]}
             if response.quick_replies:
                 message["quick_replies"] = [FacebookInterface.to_message(reply) for reply in response.quick_replies]
             return message
 
         elif isinstance(response, GenericTemplateMessage):
             return {
-                "attachment":{
-                   "type":"template",
-                   "payload":{
-                     "template_type":"generic",
-                     "elements": [FacebookInterface.to_message(element) for element in response.elements[:10]]
-                   }
+                "attachment": {
+                    "type": "template",
+                    "payload": {
+                        "template_type": "generic",
+                        "elements": [FacebookInterface.to_message(element) for element in response.elements[:10]]
+                    }
                 }
             }
 
         elif isinstance(response, AttachmentMessage):
             return {
-                "attachment":{
+                "attachment": {
                     "type": response.attachment_type,
-                    "payload":{
-                      "url":response.url
+                    "payload": {
+                        "url": response.url
                     }
                 }
             }
@@ -210,21 +221,18 @@ class FacebookInterface():
         raise ValueError('Error: Invalid message type: {}: {}'.format(type(response), response))
 
     @staticmethod
-    def send_settings(settings):
-        for setting in settings:
-            FacebookInterface.post_message(None, None, setting)
     def send_settings(setting_list):
         for setting in setting_list:
             for page_id in settings.GOLEM_CONFIG.get('FB_PAGE_TOKENS'):
-                FacebookInterface.post_message(FacebookInterface.fbid_to_uid(page_id, ''), setting)
+                FacebookInterface.post_message(page_id, setting)
 
     @staticmethod
-    def processing_start(uid, chat_id):
+    def processing_start(session: ChatSession):
         # Show typing animation
-        FacebookInterface.post_message(uid, uid, SenderActionMessage('typing_on'))
+        FacebookInterface.post_message(session, SenderActionMessage('typing_on'))
 
     @staticmethod
-    def processing_end(uid, chat_id):
+    def processing_end(session: ChatSession):
         pass
 
     @staticmethod
@@ -235,8 +243,8 @@ class FacebookInterface():
     def parse_message(raw_message, num_tries=1):
         if 'postback' in raw_message:
             payload = json.loads(raw_message['postback']['payload'], object_hook=json_deserialize)
-            payload['_message_text'] = [{'value':None}]
-            return {'entities': payload, 'type':'postback'}
+            payload['_message_text'] = [{'value': None}]
+            return {'entities': payload, 'type': 'postback'}
         elif 'message' in raw_message:
             if 'sticker_id' in raw_message['message']:
                 return FacebookInterface.parse_sticker(raw_message['message']['sticker_id'])
@@ -246,35 +254,35 @@ class FacebookInterface():
             if 'quick_reply' in raw_message['message']:
                 payload = json.loads(raw_message['message']['quick_reply'].get('payload'), object_hook=json_deserialize)
                 if payload:
-                    payload['_message_text'] = [{'value':raw_message['message']['text']}]
-                    return {'entities': payload, 'type':'postback'}
+                    payload['_message_text'] = [{'value': raw_message['message']['text']}]
+                    return {'entities': payload, 'type': 'postback'}
             if 'text' in raw_message['message']:
                 return parse_text_message(raw_message['message']['text'])
-        return {'type':'undefined'}
+        return {'type': 'undefined'}
 
     @staticmethod
     def parse_sticker(sticker_id):
-        if sticker_id in [369239383222810,369239343222814,369239263222822]:
-            return {'entities':{'emoji':'thumbs_up_sign', '_message_text':None}, 'type':'message'}
+        if sticker_id in [369239383222810, 369239343222814, 369239263222822]:
+            return {'entities': {'emoji': 'thumbs_up_sign', '_message_text': None}, 'type': 'message'}
 
-        return {'entities':{'sticker_id':sticker_id, '_message_text':None}, 'type':'message'}
+        return {'entities': {'sticker_id': sticker_id, '_message_text': None}, 'type': 'message'}
 
     @staticmethod
     def parse_attachments(attachments):
         entities = {
-            'intent':[],
-            'current_location' : [],
-            'attachment' : [],
-            '_message_text' : [{'value':None}]
+            'intent': [],
+            'current_location': [],
+            'attachment': [],
+            '_message_text': [{'value': None}]
         }
         for attachment in attachments:
             if 'coordinates' in attachment['payload']:
                 coordinates = attachment['payload']['coordinates']
-                entities['current_location'].append({'value':attachment['title'], 'name':attachment['title'],
-                                                     'coordinates':coordinates, 'timestamp': datetime.datetime.now()})
+                entities['current_location'].append({'value': attachment['title'], 'name': attachment['title'],
+                                                     'coordinates': coordinates, 'timestamp': datetime.datetime.now()})
             if 'url' in attachment['payload']:
                 url = attachment['payload']['url']
                 # TODO: add attachment type by extension
-                entities['attachment'].append({'value':url})
-                entities['intent'].append({'value':'attachment'})
-        return {'entities' : entities, 'type':'message'}
+                entities['attachment'].append({'value': url})
+                entities['intent'].append({'value': 'attachment'})
+        return {'entities': entities, 'type': 'message'}

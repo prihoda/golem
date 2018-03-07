@@ -40,7 +40,8 @@
                                 <button class="msg_btn" onclick="quickreply('{{ b.text }}')">{{ b.text }}</button>
                             {% elif b.action == 'postback' %}
                                 <button class="msg_btn"
-                                        onclick="postback('{{ b.text }}', {{ b.url }})">{{ b.text }}</button>
+                                        onclick="postback('{{ b.text }}', '{{ b.url }}')">{{ b.text }}
+                                </button>
                             {% endif %}
                         {% endfor %}
                     </div>

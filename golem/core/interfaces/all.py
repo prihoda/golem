@@ -30,6 +30,18 @@ def create_from_name(name):
             return interface
 
 
+def create_from_prefix(prefix):
+    ifs = get_interfaces()
+    for interface in ifs:
+        if interface.prefix == prefix:
+            return interface
+
+
+def create_from_chat_id(chat_id):
+    prefix = chat_id.split("_", maxsplit=1)[0]
+    return create_from_prefix(prefix)
+
+
 def init_webhooks():
     """
     Registers webhooks for telegram messages.

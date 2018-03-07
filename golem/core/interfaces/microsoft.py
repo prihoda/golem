@@ -1,7 +1,5 @@
 import json
 import logging
-import random
-import string
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -13,6 +11,8 @@ from golem.core.message_parser import parse_text_message
 from golem.core.persistence import get_redis
 from golem.tasks import accept_user_message
 
+
+# FIXME needs to be updated
 
 class MicrosoftInterface():
     name = 'microsoft'

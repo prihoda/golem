@@ -1,8 +1,8 @@
-    from django.conf import settings
+from django.conf import settings
 from django.conf.urls import url
 
-from . import views
 from golem.nlp.gui.views import nlp_view
+from . import views
 
 secret_url = settings.GOLEM_CONFIG.get('WEBHOOK_SECRET_URL')
 urlpatterns = [
@@ -22,9 +22,7 @@ urlpatterns = [
     url(r'^test/?$', views.test),
     url(r'^debug/?$', views.debug),
     url(r'^test_record/?$', views.test_record),
-    url(r'^log_user/(?P<uid>[a-zA-Z_0-9]*)/(?P<page>[0-9]*)/?$', views.log_user),
     url(r'^nlp/?', nlp_view),
-    url(r'^users/?', views.users_view)
+    url(r'^users/?', views.users_view),
     url(r'^log_conversation/(?P<group_id>[a-zA-Z_0-9]*)/(?P<page>[0-9]*)/?$', views.log_conversation)
 ]
-
