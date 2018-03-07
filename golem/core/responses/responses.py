@@ -32,6 +32,18 @@ class MessageElement:
     def get_response_for(self, platform='fb'):
         return str(self)  # TODO
 
+    def set_message_tag(self, tag):
+        self.tag = tag
+
+    def get_message_tag(self):
+        """
+        See https://developers.facebook.com/docs/messenger-platform/send-messages/message-tags
+        :return: FB message tag
+        """
+        if hasattr(self, "tag"):
+            return self.tag
+        return None
+
     def __str__(self):
         return str(self.__dict__)
 

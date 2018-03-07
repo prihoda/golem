@@ -93,10 +93,19 @@ class FacebookInterface():
 
         if isinstance(response, SenderActionMessage):
             request_mode = "messages"
-            response_dict = {'sender_action': response.action, 'recipient': {"id": fbid}}
+            response_dict = {
+                'sender_action': response.action,
+                'recipient': {"id": fbid},
+            }
         elif isinstance(response, MessageElement):
+            message_tag = response.get_message_tag()
             message = FacebookInterface.to_message(response)
-            response_dict = {"recipient": {"id": fbid}, "message": message}
+            response_dict = {
+                "recipient": {"id": fbid},
+                "message": message,
+                "messaging_type": "MESSAGE_TAG" if message_tag else "RESPONSE",
+                "tag": message_tag,
+            }
             request_mode = "messages"
         else:
             raise ValueError('Error: Invalid message type: {}: {}'.format(type(response), response))

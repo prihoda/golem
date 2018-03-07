@@ -14,7 +14,6 @@ from django.views import generic
 from django.views.decorators.csrf import csrf_exempt
 
 from golem.core.interfaces.facebook import FacebookInterface
-from golem.core.interfaces.gactions import GActionsInterface
 from golem.core.interfaces.microsoft import MicrosoftInterface
 from golem.core.interfaces.telegram import TelegramInterface
 from golem.core.persistence import get_elastic, get_redis
@@ -61,6 +60,7 @@ class TelegramView(generic.View):
         TelegramInterface.accept_request(request_body)
         return HttpResponse()
 
+
 class GActionsView(generic.View):
     def get(self, request, *args, **kwargs):
         return HttpResponse()
@@ -70,6 +70,7 @@ class GActionsView(generic.View):
         return generic.View.dispatch(self, request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
+        from golem.core.interfaces.gactions import GActionsInterface
         body = json.loads(self.request.body.decode('utf-8'))
         logging.critical(body)
         GActionsInterface.accept_request(body)
