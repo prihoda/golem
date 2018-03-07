@@ -89,8 +89,8 @@ class DialogManager:
 
         self.log.info('-- USER message ----------------------------------')
 
-        if message_type != 'schedule':
-            self.context.counter += 1
+        # if message_type != 'schedule':
+        self.context.counter += 1
 
         entities = self.context.add_entities(entities)
 

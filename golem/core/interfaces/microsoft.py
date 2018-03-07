@@ -192,7 +192,7 @@ class MicrosoftInterface():
         received = datetime.strptime(message['timestamp'], '%Y-%m-%dT%H:%M:%s.%fZ')
         now = datetime.utcnow()
 
-        if abs(now - received) > timedelta(seconds=settings.GOLEM_CONFIG['MSG_LIMIT_SECONDS']):
+        if abs(now - received) > timedelta(seconds=settings.GOLEM_CONFIG.get('MSG_LIMIT_SECONDS')):
             logging.warning('Ignoring message, too old')
             return True
         return False

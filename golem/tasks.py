@@ -29,7 +29,7 @@ def accept_user_message(interface_name, uid, raw_message, chat_id=None):
     parsed = interface.parse_message(raw_message)
     _process_message(dialog, parsed)
 
-    should_log_messages = settings.GOLEM_CONFIG.get('should_log_messages', False)
+    should_log_messages = settings.GOLEM_CONFIG.get('SHOULD_LOG_MESSAGES', False)
 
     if should_log_messages and 'text' in raw_message:
         text = raw_message['text']
