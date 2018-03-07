@@ -1,7 +1,9 @@
-from .responses import MessageElement
 import json
 import time
+
 from golem.core.persistence import get_elastic
+from .responses.responses import MessageElement
+
 
 class Logger:
     def __init__(self, uid, interface, test_id=None, enabled=True):

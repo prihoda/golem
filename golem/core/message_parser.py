@@ -1,16 +1,21 @@
-from wit import Wit
-import dateutil.parser
+import datetime
+import json
+import pickle
 import re
 from datetime import timedelta
-import datetime
+
+import dateutil.parser
 import emoji
-from .persistence import get_redis
-import pickle
-from django.conf import settings  
+import pytz
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
 from django.utils import timezone
 import json
 from urllib.parse import quote
+from wit import Wit
+
+from .persistence import get_redis
+
 
 def teach_wit(wit_token, entity, values, doc=""):
     import requests
@@ -38,14 +43,34 @@ def clear_wit_cache():
     cache = settings.GOLEM_CONFIG.get('WIT_CACHE')
     if cache:
         print('Clearing Wit cache...')
-        db = get_redis()    
+        db = get_redis()
         db.delete('wit_cache')
-        
+
 clear_wit_cache()
+
+
+def parse_with_wit(text, wit_token, num_tries=1):
+    try:
+        wit_client = Wit(access_token=wit_token, actions={})
+        return wit_client.message(text)
+    except Exception as e:
+        print('WIT ERROR: ', e)
+        # try to parse again 5 times
+        if num_tries > 5:
+            raise
+        else:
+            return parse_with_wit(text, wit_token, num_tries=num_tries + 1)
+
+
+def parse_with_nlp(text):
+    from golem.nlp.classify import classify  # avoid importing tf and spacy when not needed
+    return {'type': 'message', 'entities': classify(text)}
+
 
 def parse_text_message(text, num_tries=1):
     wit_token = settings.GOLEM_CONFIG.get('WIT_TOKEN')
-    if not wit_token:
+    if not wit_token and not hasattr(settings, "NLP_CONFIG"):
+        print('No NLP engines configured!')
         return {'type':'message','entities': {'_message_text' : {'value':text}}}
 
     cache_key = 'wit_cache'
@@ -58,21 +83,17 @@ def parse_text_message(text, num_tries=1):
             print('Got cached wit key: "{}" = {}'.format(cache_key, parsed))
             return parsed
 
-    try:
-        wit_client = Wit(access_token=wit_token, actions={})
-        wit_parsed = wit_client.message(text)
-        #print(wit_parsed)
-    except Exception as e:
-        print('WIT ERROR: ', e)
-        # try to parse again 5 times
-        if num_tries > 5:
-            raise
-        else:
-            return parse_text_message(text, num_tries=num_tries+1)
+    if hasattr(settings, "NLP_CONFIG"):
+        wit_parsed = parse_with_nlp(text)
+    elif wit_token:
+        wit_parsed = parse_with_wit(text, wit_token)
+    else:
+        raise Exception('NLP is not set up')
 
     entities = wit_parsed['entities']
     print('WIT ENTITIES:', entities)
     append = parse_additional_entities(text)
+    location = []
     for entity,values in entities.items():
 
         for value in values:
@@ -83,34 +104,23 @@ def parse_text_message(text, num_tries=1):
 
         # parse datetimes to date_intervals
         if entity == 'datetime':
-            '''
-            Output example:
-                Q: next_week: (datetime.datetime(2016, 11, 21, 0, 0, tzinfo=tzoffset(None, 3600)), datetime.datetime(2016, 11, 28, 0, 0, tzinfo=tzoffset(None, 3600)))
-                Q: tomorrow: (datetime.datetime(2016, 11, 18, 0, 0, tzinfo=tzoffset(None, 3600)), datetime.datetime(2016, 11, 19, 0, 0, tzinfo=tzoffset(None, 3600)))
-                Q: tonight: (datetime.datetime(2016, 11, 17, 18, 0, tzinfo=tzoffset(None, 3600)), datetime.datetime(2016, 11, 18, 0, 0, tzinfo=tzoffset(None, 3600)))
-                Q: at weekend: (datetime.datetime(2016, 11, 18, 18, 0, tzinfo=tzoffset(None, 3600)), datetime.datetime(2016, 11, 21, 0, 0, tzinfo=tzoffset(None, 3600)))
-            '''
-            append['date_interval'] = []
+            duration = entities.get('duration', None)
+            process_datetime(append, values, duration)
+
+        elif entity == 'district' or entity == 'street':
             for value in values:
-                try:
-                    if value['type'] == 'interval':
-                        date_from = dateutil.parser.parse(value['from']['value'])
-                        date_to = dateutil.parser.parse(value['to']['value'])
-                        grain = value['from']['grain']
-                    else:
-                        grain = value['grain']
-                        date_from = dateutil.parser.parse(value['value'])
-                        date_to = date_from + timedelta_from_grain(grain)
-                        if 'datetime' not in append:
-                            append['datetime'] = []
-                        append['datetime'].append({'value':date_from, 'grain':grain})
-                    formatted = format_date_interval(date_from, date_to, grain)
-                    append['date_interval'].append({'value':(date_from, date_to), 'grain':grain, 'formatted':formatted})
-                except ValueError as e:
-                    print('Error parsing date {}: {}', value, e)
+                if 'metadata' not in value or not isinstance(value['metadata'], dict):
+                    continue
+                metadata = value['metadata']
+                location.append({'value': value.get('value'), 'coords': metadata})
 
     if 'datetime' in entities:
         del entities['datetime']
+
+    if 'location' not in entities:
+        entities['location'] = location
+    else:
+        entities['location'] += location
 
     for (entity, value) in re.findall(re.compile(r'/([^/]+)/([^/]+)/'), text):
         if not entity in append:
@@ -126,11 +136,47 @@ def parse_text_message(text, num_tries=1):
     entities['_message_text'] = [{'value':text}]
 
     parsed = {'entities':entities, 'type':'message'}
-    
+
     if cache and 'date_interval' not in entities:
         print('Caching wit key: {} = {}'.format(text, parsed))
         db.hset('wit_cache', text, pickle.dumps(parsed))
     return parsed
+
+
+def process_datetime(append, values, duration=None):
+    """
+    Output example:
+        Q: next_week: (datetime.datetime(2016, 11, 21, 0, 0, tzinfo=tzoffset(None, 3600)), datetime.datetime(2016, 11, 28, 0, 0, tzinfo=tzoffset(None, 3600)))
+        Q: tomorrow: (datetime.datetime(2016, 11, 18, 0, 0, tzinfo=tzoffset(None, 3600)), datetime.datetime(2016, 11, 19, 0, 0, tzinfo=tzoffset(None, 3600)))
+        Q: tonight: (datetime.datetime(2016, 11, 17, 18, 0, tzinfo=tzoffset(None, 3600)), datetime.datetime(2016, 11, 18, 0, 0, tzinfo=tzoffset(None, 3600)))
+        Q: at weekend: (datetime.datetime(2016, 11, 18, 18, 0, tzinfo=tzoffset(None, 3600)), datetime.datetime(2016, 11, 21, 0, 0, tzinfo=tzoffset(None, 3600)))
+    """
+    append['date_interval'] = []
+    for value in values:
+        try:
+            if value['type'] == 'interval':
+                if 'from' not in value:  # default interval start is now
+                    date_from = datetime.datetime.now().replace(tzinfo=pytz.timezone('Europe/Prague'))
+                else:
+                    date_from = dateutil.parser.parse(value['from']['value'])
+                date_to = dateutil.parser.parse(value['to']['value']) - timedelta(seconds=1)
+                grain = value['from']['grain']
+            else:
+                grain = value['grain']
+                date_from = dateutil.parser.parse(value['value'])
+                if grain == 'week' and date_from == date_this_week(date_from.tzinfo):
+                    # change "this week" to next 7 days
+                    date_from = timezone.now()
+                    date_to = date_from + timedelta(days=7)
+                date_to = date_from + timedelta_from_grain(grain)
+                if 'datetime' not in append:
+                    append['datetime'] = []
+                append['datetime'].append({'value': date_from, 'grain': grain})
+            formatted = format_date_interval(date_from, date_to, grain)
+            append['date_interval'].append({'value': (date_from, date_to), 'grain': grain, 'formatted': formatted})
+        except ValueError as e:
+            print('Error parsing date {}: {}', value, e)
+
 
 def parse_additional_entities(text):
     entities = {}

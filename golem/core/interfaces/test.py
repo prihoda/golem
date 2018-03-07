@@ -1,5 +1,6 @@
 class TestInterface():
     name = 'test'
+    prefix = 'test'
     messages = []
     states = []
 
@@ -13,7 +14,7 @@ class TestInterface():
         return {'first_name': 'Tests', 'last_name': ''}
 
     @staticmethod
-    def post_message(uid, response):
+    def post_message(uid, chat_id, response):
         TestInterface.messages.append(response)
 
     @staticmethod
@@ -21,11 +22,11 @@ class TestInterface():
         pass
 
     @staticmethod
-    def processing_start(uid):
+    def processing_start(uid, chat_id):
         pass
 
     @staticmethod
-    def processing_end(uid):
+    def processing_end(uid, chat_id):
         pass
 
     @staticmethod

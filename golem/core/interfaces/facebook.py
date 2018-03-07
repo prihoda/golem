@@ -1,15 +1,23 @@
-import json
-import requests
-from golem.core.message_parser import parse_text_message
-from golem.core.serialize import json_serialize,json_deserialize
 import datetime
-from golem.core.responses import *
+import logging
+
+import requests
+from django.conf import settings
+
+from golem.core.message_parser import parse_text_message
 from golem.core.persistence import get_redis
-from django.conf import settings  
+from golem.core.responses.buttons import *
+from golem.core.responses.quick_reply import QuickReply
+from golem.core.responses.responses import *
+from golem.core.responses.settings import ThreadSetting, GreetingSetting, GetStartedSetting, MenuSetting
+from golem.core.responses.templates import ListTemplate
+from golem.core.serialize import json_deserialize
 from golem.tasks import accept_user_message
+
 
 class FacebookInterface():
     name = 'facebook'
+    prefix = 'fb'
     TEXT_LENGTH_LIMIT = 320
 
     # Post function to handle Facebook messages
@@ -26,8 +34,9 @@ class FacebookInterface():
                     # print("MSG FB layer GET FB:")
                     print('INCOMING RAW FB MESSAGE: {}'.format(raw_message))
                     uid = FacebookInterface.fbid_to_uid(entry['id'], raw_message['sender']['id'])
+                    uid = raw_message['sender']['id']
                     # Confirm accepted message
-                    FacebookInterface.post_message(uid, SenderActionMessage('mark_seen'))
+                    FacebookInterface.post_message(uid, uid, SenderActionMessage('mark_seen'))
                     # Add it to the message queue
                     accept_user_message.delay('facebook', uid, raw_message)
                 elif raw_message.get('timestamp'):
@@ -56,15 +65,14 @@ class FacebookInterface():
 
     @staticmethod
     def load_profile(uid, cache=True):
-        fbid = FacebookInterface.uid_to_fbid(uid)
 
         db = get_redis()
-        key = 'fb_profile_'+fbid
+        key = 'fb_profile_' + uid
 
         if not cache or not db.exists(key):
             print('Loading fb profile...')
 
-            url = "https://graph.facebook.com/v2.6/"+fbid
+            url = "https://graph.facebook.com/v2.6/" + uid
             params = {
                 'fields': 'first_name,last_name,profile_pic,locale,timezone,gender',
                 'access_token': FacebookInterface.get_page_token_for_uid(uid)
@@ -78,18 +86,16 @@ class FacebookInterface():
 
         return json.loads(db.get(key).decode('utf-8'))
 
-    @staticmethod
-    def post_message(uid, response):
 
-        # print(payload, type_)
+    @staticmethod
+    def post_message(uid, chat_id, response):
+
         if isinstance(response, SenderActionMessage):
             request_mode = "messages"
-            fbid = FacebookInterface.uid_to_fbid(uid)
-            response_dict = {'sender_action':response.action, 'recipient':{"id": fbid}}
+            response_dict = {'sender_action': response.action, 'recipient': {"id": uid}}
         elif isinstance(response, MessageElement):
             message = FacebookInterface.to_message(response)
-            fbid = FacebookInterface.uid_to_fbid(uid)
-            response_dict = {"recipient": {"id": fbid}, "message": message}
+            response_dict = {"recipient": {"id": uid}, "message": message}
             request_mode = "messages"
         elif isinstance(response, ThreadSetting):
             request_mode = "thread_settings"
@@ -97,6 +103,7 @@ class FacebookInterface():
             print('SENDING SETTING:', response_dict)
         else:
             raise ValueError('Error: Invalid message type: {}: {}'.format(type(response), response))
+
         prefix_post_message_url = 'https://graph.facebook.com/v2.6/me/'
         token = FacebookInterface.get_page_token_for_uid(uid)
         post_message_url = prefix_post_message_url+request_mode+'?access_token='+token
@@ -105,9 +112,9 @@ class FacebookInterface():
                                headers={"Content-Type": "application/json"},
                                data=json.dumps(response_dict, default=json_serialize))
         if r.status_code != 200:
-            print('ERROR: MESSAGE REFUSED: ', response_dict)
-            print('ERROR: ', r.text)
-            raise Exception(r.json()['error']['message'])
+            logging.error('ERROR: MESSAGE REFUSED: {}'.format(response_dict))
+            logging.error('ERROR: {}'.format(r.text))
+            logging.exception(r.json()['error']['message'])
 
     @staticmethod
     def to_setting(response):
@@ -192,45 +199,32 @@ class FacebookInterface():
             return message
 
         elif isinstance(response, QuickReply):
-            message = {
-                "content_type": response.content_type
-            }
-            if response.content_type=='text':
-                message['title'] = response.title[:20]
-                message['payload'] = json.dumps(response.payload if response.payload else {}, default=json_serialize)
-            return message
+            return response.to_response()
 
         elif isinstance(response, Button):
-            message = {"title": response.title}
-            if response.payload:
-                message['type'] = 'postback'
-                if not response.payload: response.payload = {}
-                response.payload['_log_text'] = response.title
-                message['payload'] = json.dumps(response.payload, default=json_serialize)
-            if response.url:
-                message['type'] = 'web_url'
-                message['url'] = response.url
-                message['webview_height_ratio'] = response.webview_height_ratio
-            if response.phone_number:
-                message['type'] = 'phone_number'
-                message['payload'] = response.phone_number
-            return message
+            return response.to_response()
+
+        elif isinstance(response, ListTemplate):
+            return response.to_response()
 
         raise ValueError('Error: Invalid message type: {}: {}'.format(type(response), response))
 
     @staticmethod
+    def send_settings(settings):
+        for setting in settings:
+            FacebookInterface.post_message(None, None, setting)
     def send_settings(setting_list):
         for setting in setting_list:
             for page_id in settings.GOLEM_CONFIG.get('FB_PAGE_TOKENS'):
                 FacebookInterface.post_message(FacebookInterface.fbid_to_uid(page_id, ''), setting)
 
     @staticmethod
-    def processing_start(uid):
+    def processing_start(uid, chat_id):
         # Show typing animation
-        FacebookInterface.post_message(uid, SenderActionMessage('typing_on'))
+        FacebookInterface.post_message(uid, uid, SenderActionMessage('typing_on'))
 
     @staticmethod
-    def processing_end(uid):
+    def processing_end(uid, chat_id):
         pass
 
     @staticmethod
@@ -276,7 +270,8 @@ class FacebookInterface():
         for attachment in attachments:
             if 'coordinates' in attachment['payload']:
                 coordinates = attachment['payload']['coordinates']
-                entities['current_location'].append({'value':attachment['title'], 'name':attachment['title'], 'coordinates':coordinates})
+                entities['current_location'].append({'value':attachment['title'], 'name':attachment['title'],
+                                                     'coordinates':coordinates, 'timestamp': datetime.datetime.now()})
             if 'url' in attachment['payload']:
                 url = attachment['payload']['url']
                 # TODO: add attachment type by extension

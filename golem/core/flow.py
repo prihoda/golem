@@ -1,5 +1,7 @@
 import re
+
 from .templates import Templates
+
 
 class Flow:
     def __init__(self, name, dialog, definition):
@@ -19,8 +21,9 @@ class Flow:
 
 class State:
     def __init__(self, name, dialog, definition):
-        self.name = name
-        self.dialog = dialog
+        from .dialog_manager import DialogManager
+        self.name = name  # type: str
+        self.dialog = dialog  # type: DialogManager
         self.intent_transitions = definition.get('intent_transitions') or {}
         self.intent = definition.get('intent')
         self.init = self.create_action(definition.get('init'))

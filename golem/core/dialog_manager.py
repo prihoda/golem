@@ -1,41 +1,54 @@
-from .context import Context
-from .serialize import json_deserialize,json_serialize
-from .persistence import get_redis
-from .responses import MessageElement
-from .tests import ConversationTestRecorder
-from .flow import Flow
-from .responses import *
 import json
-import re
-import importlib, logging
+import logging
 import time
-from django.conf import settings  
-from .logger import Logger
+
+import importlib
+import re
+from django.conf import settings
+
+from golem.core import message_logger
+from golem.core.responses.responses import TextMessage
 from golem.tasks import accept_inactivity_callback, accept_schedule_callback
+from .context import Context
+from .flow import Flow
+from .logger import Logger
+from .persistence import get_redis
+from .serialize import json_deserialize, json_serialize
+from .tests import ConversationTestRecorder
+
 
 class DialogManager:
-    version = '1.28'
+    version = '1.29'
 
+    def __init__(self, uid, interface, chat_id=None):
+        self.uid = str(uid)
+        self.chat_id = str(chat_id) if chat_id else str(uid)
     def __init__(self, uid, interface, test_id=None, use_logging=True):
         self.uid = uid
         self.test_id = test_id
         self.interface = interface
+        self.logger = Logger(uid=uid, interface=interface)
+        self.profile = interface.load_profile(local_id(uid))
         self.logger = Logger(uid=uid, interface=interface, test_id=test_id, enabled=use_logging)
         self.profile = interface.load_profile(uid)
         self.db = get_redis()
         self.log = logging.getLogger()
-            
+
+        self.should_log_messages = settings.GOLEM_CONFIG.get('should_log_messages', False)
+        self.error_message_text = settings.GOLEM_CONFIG.get('error_message_text', 'Oh no! You broke me! :(')
+
         entities = {}
         version = self.db.get('dialog_version')
         self.log.info('Initializing dialog for user %s...' % uid)
         self.current_state_name = None
-        self.context = None
-        if version and version.decode('utf-8')==DialogManager.version and self.db.hexists('session_entities', self.uid):
-            entities_string = self.db.hget('session_entities', self.uid)
-            history_string = self.db.hget('session_history', self.uid)
+        self.context = None  # type: Context
+        if version and version.decode('utf-8') == DialogManager.version and self.db.hexists('session_entities',
+                                                                                            self.chat_id):
+            entities_string = self.db.hget('session_entities', self.chat_id)
+            history_string = self.db.hget('session_history', self.chat_id)
             self.init_flows()
-            state = self.db.hget('session_state', self.uid).decode('utf-8')
-            counter = int(self.db.hget('session_counter', self.uid))
+            state = self.db.hget('session_state', self.chat_id).decode('utf-8')
+            counter = int(self.db.hget('session_counter', self.chat_id))
             self.log.info('Session exists at state %s' % (state))
             self.move_to(state, initializing=True)
             #self.log.info(entities_string)
@@ -48,7 +61,7 @@ class DialogManager:
             history = []
             self.init_flows()
             self.logger.log_user(self.profile)
-        self.context = Context(entities=entities, history=history, counter=counter, dialog=self)
+        self.context = Context(entities=entities, history=history, counter=counter, dialog=self)  # type: Context
 
     def init_flows(self):
         self.flows = {}
@@ -58,7 +71,7 @@ class DialogManager:
         self.current_state_name = 'default.root'
 
     def create_flows(self):
-        flow = {}  
+        flow = {}
         BOTS = settings.GOLEM_CONFIG.get('BOTS')
         for module_name in BOTS:
             module = importlib.import_module(module_name)
@@ -66,13 +79,13 @@ class DialogManager:
         return flow
 
     @staticmethod
-    def clear_uid(uid):
+    def clear_chat(chat_id):
         db = get_redis()
-        db.hdel('session_state', uid)
-        db.hdel('session_entities', uid)
+        db.hdel('session_state', chat_id)
+        db.hdel('session_entities', chat_id)
 
     def process(self, message_type, entities):
-        self.interface.processing_start(self.uid)
+        self.interface.processing_start(local_id(self.uid), local_id(self.chat_id))
         accepted_time = time.time()
         accepted_state = self.current_state_name
         # Only process messages and postbacks (not 'seen_by's, etc)
@@ -81,8 +94,8 @@ class DialogManager:
 
         self.log.info('-- USER message ----------------------------------')
 
-        if message_type != 'schedule':
-            self.context.counter += 1
+        # if message_type != 'schedule':
+        self.context.counter += 1
 
         entities = self.context.add_entities(entities)
 
@@ -100,7 +113,7 @@ class DialogManager:
                 self.run_accept(save_identical=True)
                 self.save_state()
 
-        self.interface.processing_end(self.uid)
+        self.interface.processing_end(local_id(self.uid), local_id(self.chat_id))
 
         # leave logging message to the end so that the user does not wait
         self.logger.log_user_message(message_type, entities, accepted_time, accepted_state)
@@ -110,18 +123,20 @@ class DialogManager:
         if at:
             if at.tzinfo is None or at.tzinfo.utcoffset(at) is None:
                 raise Exception('Use datetime with timezone, e.g. "from django.utils import timezone"')
-            accept_schedule_callback.apply_async((self.interface.name, self.uid, callback_name), eta=at)
+            accept_schedule_callback.apply_async((self.interface.name, self.chat_id, callback_name), eta=at)
         elif seconds:
-            accept_schedule_callback.apply_async((self.interface.name, self.uid, callback_name), countdown=seconds)
+            accept_schedule_callback.apply_async((self.interface.name, self.chat_id, callback_name), countdown=seconds)
         else:
             raise Exception('Specify either "at" or "seconds" parameter')
 
     def inactive(self, callback_name, seconds):
         self.log.info('Setting inactivity callback "{}" after {} seconds'.format(callback_name, seconds))
-        accept_inactivity_callback.apply_async((self.interface.name, self.uid, self.context.counter, callback_name, seconds), countdown=seconds)
+        accept_inactivity_callback.apply_async(
+            (self.interface.name, self.uid, self.chat_id, self.context.counter, callback_name, seconds),
+            countdown=seconds)
 
     def save_inactivity_callback(self):
-        self.db.hset('session_active', self.uid, time.time())
+        self.db.hset('session_active', self.chat_id, time.time())
         callbacks = settings.GOLEM_CONFIG.get('INACTIVE_CALLBACKS')
         if not callbacks:
             return
@@ -155,15 +170,15 @@ class DialogManager:
         if not state.accept:
             self.log.warn('State does not have an ACCEPT action, we are done.')
             return
-        response, new_state_name = state.accept(state=state)
+        response, new_state_name = state.accept(state=state)  # FIXME <-- don't crash on invalid return value (not iterable)
         self.send_response(response)
         self.move_to(new_state_name, save_identical=save_identical)
 
     def run_init(self):
-        self.log.warn('Running INIT action of {}'.format(self.current_state_name))
+        self.log.warning('Running INIT action of {}'.format(self.current_state_name))
         state = self.get_state()
         if not state.init:
-            self.log.warn('State does not have an INIT action, we are done.')
+            self.log.warning('State does not have an INIT action, we are done.')
             return
         response, new_state_name = state.init(state=state)
         self.send_response(response)
@@ -187,7 +202,7 @@ class DialogManager:
                     new_state_name = state.name
                     break
         # Check accepted intent of all flows
-        if not new_state_name:                
+        if not new_state_name:
             for flow in self.flows.values():
                 if re.match(flow.intent, intent):
                     new_state_name = flow.name+'.root'
@@ -243,10 +258,25 @@ class DialogManager:
             if self.recording:
                 ConversationTestRecorder.record_state_change(self.current_state_name)
 
-            if action=='init':
-                self.run_init()
-            elif action=='accept':
-                self.run_accept()
+            try:
+
+                if action == 'init':
+                    self.run_init()
+                elif action == 'accept':
+                    self.run_accept()
+
+            except Exception as e:
+                logging.error('*****************************************************')
+                logging.error('Exception occurred while running action {} of state {}'
+                              .format(action, new_state_name))
+                logging.error('Uid: {}, Chat id: {}'.format(self.uid, self.chat_id))
+                try:
+                    context_debug = self.get_state().dialog.context.debug()
+                    logging.error('Context: {}'.format(context_debug))
+                except:
+                    pass
+                logging.exception('Exception follows')
+                self.send_response([TextMessage(self.error_message_text)])
 
         self.save_state()
         return True
@@ -255,11 +285,11 @@ class DialogManager:
         if not self.context:
             return
         self.log.info('Saving state at %s' % (self.current_state_name))
-        self.db.hset('session_state', self.uid, self.current_state_name)
-        self.db.hset('session_history', self.uid, json.dumps(self.context.history, default=json_serialize))
-        self.db.hset('session_entities', self.uid, json.dumps(self.context.entities, default=json_serialize))
-        self.db.hset('session_counter', self.uid, self.context.counter)
-        self.db.hset('session_interface', self.uid, self.interface.name)
+        self.db.hset('session_state', self.chat_id, self.current_state_name)
+        self.db.hset('session_history', self.chat_id, json.dumps(self.context.history, default=json_serialize))
+        self.db.hset('session_entities', self.chat_id, json.dumps(self.context.entities, default=json_serialize))
+        self.db.hset('session_counter', self.chat_id, self.context.counter)
+        self.db.hset('session_interface', self.chat_id, self.interface.name)
         self.db.set('dialog_version', DialogManager.version)
 
 
@@ -276,7 +306,7 @@ class DialogManager:
                 response = TextMessage(text=response)
 
             # Send the response
-            self.interface.post_message(self.uid, response)
+            self.interface.post_message(local_id(self.uid), local_id(self.chat_id), response)
 
             # Record if recording
             if self.recording:
@@ -287,3 +317,15 @@ class DialogManager:
             self.log.info('Message: {}'.format(response))
             self.logger.log_bot_message(response, self.current_state_name)
 
+            text = response.text if hasattr(response, 'text') else (response if isinstance(response, str) else None)
+            if text and self.should_log_messages:
+                message_logger.on_message.delay(self.uid, self.chat_id, text, self, from_user=False)
+
+
+def local_id(id):
+    """
+    Removes any prefixes from the ID.
+    :param id:
+    :return:
+    """
+    return id.split('_', maxsplit=1)[1]
