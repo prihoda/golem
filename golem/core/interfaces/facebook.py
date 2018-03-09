@@ -58,10 +58,14 @@ class FacebookInterface():
 
     @staticmethod
     def get_page_token(page_id):
-        tokens = settings.GOLEM_CONFIG.get('FB_PAGE_TOKENS')
-        if page_id not in tokens:
-            raise Exception('Page id "{}" not in tokens: {}'.format(page_id, tokens))
-        return tokens.get(page_id)
+        if 'FB_PAGE_TOKENS' in settings.GOLEM_CONFIG:
+            tokens = settings.GOLEM_CONFIG.get('FB_PAGE_TOKENS')
+            if page_id not in tokens:
+                raise Exception('Page id "{}" not in tokens: {}'.format(page_id, tokens))
+            return tokens.get(page_id)
+        elif 'FB_PAGE_TOKEN' in settings.GOLEM_CONFIG:  # there is just one page
+            return settings.GOLEM_CONFIG.get("FB_PAGE_TOKEN")
+        return None
 
     @staticmethod
     def load_profile(uid, cache=True):
@@ -232,8 +236,11 @@ class FacebookInterface():
     @staticmethod
     def send_settings(setting_list):
         for setting in setting_list:
-            for page_id in settings.GOLEM_CONFIG.get('FB_PAGE_TOKENS'):
-                FacebookInterface.post_message(page_id, setting)
+            if 'FB_PAGE_TOKENS' in settings.GOLEM_CONFIG:
+                for page_id in settings.GOLEM_CONFIG.get('FB_PAGE_TOKENS'):
+                    FacebookInterface.post_setting(page_id, setting)
+            elif 'FB_PAGE_TOKEN' in settings.GOLEM_CONFIG:
+                FacebookInterface.post_setting("", setting)
 
     @staticmethod
     def processing_start(session: ChatSession):
