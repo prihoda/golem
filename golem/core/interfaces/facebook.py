@@ -92,7 +92,7 @@ class FacebookInterface():
 
     @staticmethod
     def post_message(session: ChatSession, response):
-        fbid = session.meta.get("fbid")
+        fbid = session.meta.get("user_id")
         page_id = session.meta.get("page_id")
 
         if isinstance(response, SenderActionMessage):

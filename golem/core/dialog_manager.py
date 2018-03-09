@@ -25,7 +25,7 @@ class DialogManager:
         self.session = session
         self.uid = session.chat_id  # for backwards compatibility
         self.logger = Logger(session)
-        self.profile = session.interface.load_profile(session.interface)  # FIXME not here
+        self.profile = None  # session.interface.load_profile(session.interface)  # FIXME not here
         self.db = get_redis()
         self.log = logging.getLogger()
 
