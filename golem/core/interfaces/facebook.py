@@ -38,8 +38,8 @@ class FacebookInterface():
                     page_id = entry['id']
                     chat_id = FacebookInterface.create_chat_id(page_id, user_id)
                     meta = {"user_id": user_id, "page_id": page_id}
-                    # TODO profile
                     session = ChatSession(FacebookInterface, chat_id, meta=meta)
+                    FacebookInterface.fill_session_profile(session)
                     # Confirm accepted message
                     FacebookInterface.post_message(session, SenderActionMessage('mark_seen'))
                     # Add it to the message queue
@@ -68,18 +68,18 @@ class FacebookInterface():
         return None
 
     @staticmethod
-    def load_profile(uid, cache=True):
+    def load_profile(user_id, page_id, cache=True):
 
         db = get_redis()
-        key = 'fb_profile_' + uid
+        key = 'fb_profile_' + user_id
 
         if not cache or not db.exists(key):
             print('Loading fb profile...')
 
-            url = "https://graph.facebook.com/v2.6/" + uid
+            url = "https://graph.facebook.com/v2.6/" + user_id
             params = {
                 'fields': 'first_name,last_name,profile_pic,locale,timezone,gender',
-                'access_token': FacebookInterface.get_page_token(uid)  # FIXME
+                'access_token': FacebookInterface.get_page_token(page_id)
             }
             res = requests.get(url, params=params)
             if not res.status_code == requests.codes.ok:
@@ -89,6 +89,16 @@ class FacebookInterface():
             db.set(key, json.dumps(res.json()), ex=3600 * 24 * 14)  # save value, expire in 14 days
 
         return json.loads(db.get(key).decode('utf-8'))
+
+    @staticmethod
+    def fill_session_profile(session: ChatSession):
+        if not session:
+            raise ValueError("Session is None")
+        user_id, page_id = session.meta.get("user_id"), session.meta.get("page_id")
+        profile_dict = FacebookInterface.load_profile(user_id, page_id)
+        session.profile.first_name = profile_dict.get("first_name")
+        session.profile.last_name = profile_dict.get("last_name")
+        return session
 
     @staticmethod
     def post_message(session: ChatSession, response):
