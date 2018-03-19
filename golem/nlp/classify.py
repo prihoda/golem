@@ -23,28 +23,32 @@ glove = utils.get_glove()
 logging.debug('GloVe and TF imported')
 
 models = {}
+imputers = {}
 
 NLP_DATA_DIR = utils.data_dir()
+MAX_WORD_COUNT = settings.NLP_CONFIG.get("MAX_WORD_COUNT", 10)
 
 
 def get_model(entity, entity_dir) -> Model:
     """Lazy loads a tf model."""
     if entity not in models:
         models[entity] = Model(entity, entity_dir)
+        imputers[entity] = utils.get_imputation_rules(entity)
     return models[entity]
 
 
-def word2vec(text):
+def word2vec(text, entity):
     """
     Converts entity to a vector for tensorflow.
     :param text     Text to be converted to BOW.
     :returns    numpy array of features
     """
     features = [np.zeros(glove.get_dimension()) for x in range(10)]
-    clean_text = cleanup.tokenize(text, stemming=False, language="cz")
+    tokens = cleanup.tokenize(text, stemming=False, language="cz")
+    clean_text = cleanup.imputer(tokens, imputers.get(entity))
     print("Tokens:", clean_text)
     for idx, word in enumerate(clean_text):
-        if idx > 10:
+        if idx > MAX_WORD_COUNT:
             logging.warning('Message too long!')  # FIXME allow longer messages
         vec = glove.get_vector(word)
         if vec is not None:
@@ -64,7 +68,7 @@ def classify_trait(text, entity, threshold):
 
     logging.info("classifying " + entity_dir + " " + entity + ' with feature count: ' + str(len(words)))
     model = get_model(entity, entity_dir)
-    bow = word2vec(text)
+    bow = word2vec(text, entity)
     y_pred = model.predict(bow)[0]
     logging.debug(y_pred)
     print(y_pred)
@@ -155,7 +159,7 @@ def test_all():
             model = get_model(entity, model_dir)
             pickle_data = pickle.load(open(os.path.join(model_dir, 'pickle.json'), 'rb'))
             classes = pickle_data['classes']
-            x = [word2vec(text) for text, label in examples]
+            x = [word2vec(text, entity) for text, label in examples]
             for text, label in examples:
                 print(text, label)
             y = [classes.index(label) if label is not None else -1 for text, label in examples]

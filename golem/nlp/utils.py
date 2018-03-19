@@ -1,9 +1,12 @@
+import json
+
 import os
 from typing import List
 
 import logging
 from django.conf import settings
 
+from golem.nlp import cleanup
 from golem.nlp.data_model import Entity
 
 
@@ -42,3 +45,16 @@ def data_dir():
 
 def get_default_language():
     return settings.NLP_CONFIG.get('LANGUAGE', 'en')
+
+
+def get_training_data(entity):
+    path = os.path.join(data_dir(), "training_data", entity + ".json")
+    with open(path) as f:
+        data = json.load(f)
+    return data
+
+
+def get_imputation_rules(entity):
+    data = get_training_data(entity)
+    imputation = data.get('imputation', [])
+    return cleanup.build_imputation_rules(imputation)

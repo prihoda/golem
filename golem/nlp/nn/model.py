@@ -112,8 +112,8 @@ class Model:
             print('Shape:', labels_onehot.shape)
             label_cnt = labels_onehot.shape[1]
 
-            batch_size = settings.NLP_CONFIG.get("batch_size", 32)
-            initial_step = settings.NLP_CONFIG.get("initial_step", 1e-4)
+            batch_size = settings.NLP_CONFIG.get("BATCH_SIZE", 32)
+            initial_step = settings.NLP_CONFIG.get("INITIAL_STEP", 1e-4)
 
             x, y, y_, W = self.get_shape(feature_cnt, label_cnt, word_cnt, batch_size=batch_size)
 
@@ -162,7 +162,7 @@ class Model:
                               session=self.session)
                 tensorboard_result = self.session.run(tensorboard_op, feed_dict={x: _x_, y: _y_})
                 self.file_writer.add_summary(tensorboard_result, i)
-                print('Generation ', i, '/', num_epochs,
+                print('Generation ', i, '/', num_iterations,
                       'Xentropy:', self.session.run(loss_without_l2, feed_dict={x: _x_, y: _y_}),
                       'Accuracy:', self.session.run(accuracy, feed_dict={x: _x_, y: _y_}))
 

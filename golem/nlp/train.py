@@ -13,7 +13,7 @@ from golem.nlp.nn.model import Model
 from golem.nlp.nn.seq2seq import Seq2Seq
 
 
-def process(entities):
+def process(entities, imputation_rules):
     """
     Processes entities to stemmed words with SpaCy.
     :returns:   tuple of words, documents, classes
@@ -34,6 +34,7 @@ def process(entities):
         for sample in entity['samples']:
             # a text pattern
             tokens = cleanup.tokenize(sample)
+            tokens = cleanup.imputer(tokens, imputation_rules)
             words.extend(tokens)
             documents.append((tokens, value))
 
@@ -146,8 +147,10 @@ def train_all(included=None):
             if strategy == 'trait':
                 # train as neural network
                 samples = data['data']
+                imputation = data.get('imputation', [])
+                rules = cleanup.build_imputation_rules(imputation)
                 num_iterations = data.get("iterations", 1000)
-                words, documents, classes = process(samples)
+                words, documents, classes = process(samples, rules)
                 x, y, junk = make_tensors(words, documents, classes)
                 entity_dir = os.path.join(utils.data_dir(), 'model', entity)
                 train_entity(x, y, junk, entity, entity_dir, num_iterations)
