@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Chat',
             fields=[
-                ('chat_id', models.CharField(max_length=256, primary_key=True, serialize=False)),
+                ('chat_id', models.CharField(max_length=255, primary_key=True, serialize=False)),
                 ('user_uid', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='golem.User')),
             ],
         ),

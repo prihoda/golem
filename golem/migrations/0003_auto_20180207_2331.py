@@ -17,15 +17,15 @@ class Migration(migrations.Migration):
                 ('text', models.TextField(blank=True, null=True)),
                 ('is_from_user', models.BooleanField()),
                 ('time', models.DateTimeField(auto_now=True)),
-                ('intent', models.TextField(blank=True, db_index=True, max_length=256, null=True)),
-                ('state', models.TextField(blank=True, db_index=True, max_length=256, null=True)),
+                ('intent', models.TextField(blank=True, db_index=True, max_length=255, null=True)),
+                ('state', models.TextField(blank=True, db_index=True, max_length=255, null=True)),
             ],
         ),
         migrations.CreateModel(
             name='QuickReply',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('text', models.TextField(max_length=256)),
+                ('text', models.TextField(max_length=255)),
                 ('message', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='golem.Message')),
             ],
         ),

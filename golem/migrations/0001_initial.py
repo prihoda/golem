@@ -15,9 +15,9 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='User',
             fields=[
-                ('uid', models.CharField(max_length=256, primary_key=True, serialize=False)),
-                ('first_name', models.CharField(blank=True, max_length=256, null=True)),
-                ('surname', models.CharField(blank=True, max_length=256, null=True)),
+                ('uid', models.CharField(max_length=255, primary_key=True, serialize=False)),
+                ('first_name', models.CharField(blank=True, max_length=255, null=True)),
+                ('surname', models.CharField(blank=True, max_length=255, null=True)),
                 ('last_active', models.DateTimeField(blank=True, null=True)),
                 ('message_cnt', models.PositiveIntegerField(default=0)),
             ],
