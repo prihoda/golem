@@ -2,9 +2,9 @@ from django.db import models
 
 
 class User(models.Model):
-    uid = models.CharField(max_length=256, primary_key=True)
-    first_name = models.CharField(max_length=256, blank=True, null=True)
-    surname = models.CharField(max_length=256, blank=True, null=True)
+    uid = models.CharField(max_length=255, primary_key=True)
+    first_name = models.CharField(max_length=255, blank=True, null=True)
+    surname = models.CharField(max_length=255, blank=True, null=True)
     message_cnt = models.PositiveIntegerField(default=0)
 
     def get_chats(self):
@@ -13,7 +13,7 @@ class User(models.Model):
 
 
 class Chat(models.Model):
-    chat_id = models.CharField(max_length=256, primary_key=True)
+    chat_id = models.CharField(max_length=255, primary_key=True)
     user_uid = models.ForeignKey(User, on_delete=models.CASCADE)
 
 
@@ -23,13 +23,13 @@ class Message(models.Model):
     text = models.TextField(blank=True, null=True)
     is_from_user = models.BooleanField()
     time = models.DateTimeField(auto_now=True)
-    intent = models.TextField(max_length=256, blank=True, null=True, db_index=True)
-    state = models.TextField(max_length=256, blank=True, null=True, db_index=True)
+    intent = models.TextField(max_length=255, blank=True, null=True, db_index=True)
+    state = models.TextField(max_length=255, blank=True, null=True, db_index=True)
 
 
 class QuickReply(models.Model):
     message = models.ForeignKey(Message, on_delete=models.CASCADE)
-    text = models.TextField(max_length=256, blank=False, null=False)
+    text = models.TextField(max_length=255, blank=False, null=False)
     # TODO was_clicked : boolean
 
 # class Attachment(models.Model):  TODO
