@@ -19,7 +19,7 @@ from .tests import ConversationTestRecorder
 
 
 class DialogManager:
-    version = '1.30'
+    version = '1.31'
 
     def __init__(self, session: ChatSession):
         self.session = session
@@ -32,32 +32,27 @@ class DialogManager:
         self.should_log_messages = settings.GOLEM_CONFIG.get('SHOULD_LOG_MESSAGES', False)
         self.error_message_text = settings.GOLEM_CONFIG.get('ERROR_MESSAGE_TEXT', 'Oh no! You broke me! :(')
 
-        entities = {}
+        context_dict = {}
         version = self.db.get('dialog_version')
         self.log.info('Initializing dialog for chat %s...' % session.chat_id)
         self.current_state_name = None
-        self.context = None  # type: Context
-        if version and \
-                version.decode('utf-8') == DialogManager.version and \
-                self.db.hexists('session_entities', self.session.chat_id):
-            entities_string = self.db.hget('session_entities', self.session.chat_id)
-            history_string = self.db.hget('session_history', self.session.chat_id)
-            self.init_flows()
+        self.init_flows()
+
+        if version and version.decode('utf-8') == DialogManager.version and \
+                self.db.hexists('session_context', self.session.chat_id):
+
             state = self.db.hget('session_state', self.session.chat_id).decode('utf-8')
-            counter = int(self.db.hget('session_counter', self.session.chat_id))
-            self.log.info('Session exists at state %s' % (state))
+            self.log.info('Session exists at state %s' % state)
             self.move_to(state, initializing=True)
             # self.log.info(entities_string)
-            entities = json.loads(entities_string.decode('utf-8'), object_hook=json_deserialize)
-            history = json.loads(history_string.decode('utf-8'), object_hook=json_deserialize)
+            context_string = self.db.hget('session_context', self.session.chat_id)
+            context_dict = json.loads(context_string.decode('utf-8'), default=json_deserialize)
         else:
             self.current_state_name = 'default.root'
             self.log.info('Creating new session...')
-            counter = 0
-            history = []
-            self.init_flows()
             self.logger.log_user(self.profile)
-        self.context = Context(entities=entities, history=history, counter=counter, dialog=self)  # type: Context
+
+        self.context = Context.from_dict(dialog=self, data=context_dict)
 
     def init_flows(self):
         self.flows = {}
@@ -78,7 +73,7 @@ class DialogManager:
     def clear_chat(chat_id):
         db = get_redis()
         db.hdel('session_state', chat_id)
-        db.hdel('session_entities', chat_id)
+        db.hdel('session_context', chat_id)
 
     def process(self, message_type, entities):
         self.session.interface.processing_start(self.session)
@@ -282,10 +277,8 @@ class DialogManager:
             return
         self.log.info('Saving state at %s' % (self.current_state_name))
         self.db.hset('session_state', self.session.chat_id, self.current_state_name)
-        self.db.hset('session_history', self.session.chat_id, json.dumps(self.context.history, default=json_serialize))
-        self.db.hset('session_entities', self.session.chat_id,
-                     json.dumps(self.context.entities, default=json_serialize))
-        self.db.hset('session_counter', self.session.chat_id, self.context.counter)
+        context_json = json.dumps(self.context.to_dict(), default=json_serialize)
+        self.db.hset('session_context', self.session.chat_id, context_json)
         self.db.hset('session_interface', self.session.chat_id, self.session.interface.name)
         self.db.set('dialog_version', DialogManager.version)
 
