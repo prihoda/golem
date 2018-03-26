@@ -3,6 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Golem chatbot</title>
 </head>
 <body>
@@ -15,7 +16,7 @@
         {% for m in messages %}
             <div class="message_container" style="float: {% if m.is_response %} left {% else %} right {% endif %};">
                 {% if m.is_response %}
-                    <img class="circle-image" src="{% static bot_img %}"/> {% endif %}
+                <img class="circle-image" src="{% static bot_img %}"/> {% endif %}
                 <div class="msg" style="text-align: {% if m.is_response %} left {% else %} right {% endif %}">
                     <div class="bubble"><span class="text">{{ m.text }}</span></div>
 
@@ -154,10 +155,12 @@
     }
 
     #header {
-        background-color: #3F51B5;
-        box-shadow: 0 4px 12px #777777;
+        position: -webkit-sticky;
+        top: 0;
+        background-color: #00d1eb;
+        box-shadow: 0 4px 12px #aaaaaa;
         width: 100%;
-        height: 10%;
+        height: auto;
         z-index: 100;
     }
 
@@ -174,15 +177,17 @@
 
     #footer {
         width: 100vw;
+        position: -webkit-sticky;
+        bottom: 0;
         padding: 10px 0;
-        background-color: #3F51B5;
-        box-shadow: 0 0 12px #777777;
+        background-color: white;
         z-index: 100;
     }
 
     #list_wrap {
         background-color: white;
         width: 100vw;
+        height: available;
         margin: 0 auto;
         overflow-x: auto;
         overflow-y: scroll;
@@ -192,6 +197,7 @@
         width: 80vw;
         margin-left: auto;
         margin-right: auto;
+        max-width: 1366px;
     }
 
     #button_logout {
@@ -228,7 +234,8 @@
     #form_msg {
         float: right;
         font-family: Roboto, sans-serif;
-        margin-right: 10%;
+        {#margin-right: 10%;#}
+        width: 100%;
     }
 
     .circle-image {
@@ -236,7 +243,7 @@
         height: 48px;
         border-radius: 100%;
         position: relative;
-        display: inline;
+        display: inline-block;
     {#        background-color: #eaeaea;#}
     }
 
@@ -246,7 +253,7 @@
     }
 
     .msg > .text {
-        background-color: #5C6BC0;
+        background-color: #00d1eb;
         color: white;
         padding: 8px;
         border-radius: 20px;
@@ -255,9 +262,11 @@
     }
 
     .bubble {
-        background-color: #5C6BC0;
+        background-color: #00d1eb;
         color: white;
-        padding: 8px;
+        padding: 8px 24px;
+        margin-left: 16px;
+        margin-right: 16px;
         border-radius: 20px;
         z-index: 0;
     {#        line-height: 200%; TODO add this it looks cool #}
@@ -340,10 +349,12 @@
         border: none;
         border-radius: 2px;
         padding: 12px;
+        box-shadow: 0 5px 10px #aaaaaa;
     }
 
     input[type='submit']:focus, input[type='submit']:hover {
         background-color: #eaeaea;
+        box-shadow: 0 5px 10px #777777;
     }
 
     input[type="text"] {
@@ -351,13 +362,15 @@
         border: none;
         border-bottom: 1px solid #bcbcbc;
         font-family: "Roboto", 'sans-serif';
-        background-color: #f0f0f0;
+        background-color: white;
+        box-shadow: 0 3px 10px #aaaaaa;
         color: #777777;
         -webkit-transition: box-shadow 0.3s, border 0.3s;
         -moz-transition: box-shadow 0.3s, border 0.3s;
         -ms-transition: box-shadow 0.3s, border 0.3s;
         -o-transition: box-shadow 0.3s, border 0.3s;
         transition: box-shadow 0.3s, border 0.3s;
+        width: 90%;
     }
 
     #form_msg > label {
@@ -365,9 +378,11 @@
     }
 
     input[type="text"]:focus {
-        border-bottom: 2px solid #777;
+        border-bottom: 2px solid #00d1eb;
         color: #222222;
         background-color: white;
+        box-shadow: 0 3px 1px #aaaaaa;
+        outline: none;
         -webkit-transition: border 0.3s;
         -moz-transition: border 0.3s;
         -ms-transition: border 0.3s;

@@ -37,8 +37,8 @@ def webgui(request):
         context = {
             'uid': uid, 'messages': messages,
             'form': MessageForm, 'timestamp': datetime.now().timestamp(),
-            'user_img': settings.GOLEM_CONFIG.get('WEBGUI_USER_IMAGE'),
-            'bot_img': settings.GOLEM_CONFIG.get('WEBGUI_BOT_IMAGE')
+            'user_img': settings.GOLEM_CONFIG.get('WEBGUI_USER_IMAGE', 'images/icon_user.png'),
+            'bot_img': settings.GOLEM_CONFIG.get('WEBGUI_BOT_IMAGE', 'images/icon_robot.png')
         }
         return render(request, 'index.html', context)
     else:
