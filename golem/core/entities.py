@@ -40,6 +40,7 @@ class Entity:
                 name=data['name'], value=data['value'], counter=data.get('counter', 0),
                 scope=data.get('scope'), state=data.get('state'), raw=data.get('raw')
             )
+        print("Refusing to load empty entity!")
         return None
 
 

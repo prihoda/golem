@@ -19,7 +19,7 @@ from .tests import ConversationTestRecorder
 
 
 class DialogManager:
-    version = '1.31'
+    version = '1.32'
 
     def __init__(self, session: ChatSession):
         self.session = session
@@ -28,6 +28,7 @@ class DialogManager:
         self.profile = None  # session.interface.load_profile(session.interface)  # FIXME not here
         self.db = get_redis()
         self.log = logging.getLogger()
+        self.context = None  # type: Context
 
         self.should_log_messages = settings.GOLEM_CONFIG.get('SHOULD_LOG_MESSAGES', False)
         self.error_message_text = settings.GOLEM_CONFIG.get('ERROR_MESSAGE_TEXT', 'Oh no! You broke me! :(')
@@ -46,7 +47,7 @@ class DialogManager:
             self.move_to(state, initializing=True)
             # self.log.info(entities_string)
             context_string = self.db.hget('session_context', self.session.chat_id)
-            context_dict = json.loads(context_string.decode('utf-8'), default=json_deserialize)
+            context_dict = json.loads(context_string.decode('utf-8'), object_hook=json_deserialize)
         else:
             self.current_state_name = 'default.root'
             self.log.info('Creating new session...')
@@ -141,9 +142,9 @@ class DialogManager:
         if not record:
             return False
         if record_age == 0:
-            if record == 'start':
+            if record.value == 'start':
                 self.send_response(ConversationTestRecorder.record_start())
-            elif record == 'stop':
+            elif record.value == 'stop':
                 self.send_response(ConversationTestRecorder.record_stop())
             else:
                 self.send_response("Use /test_record/start/ or /test_record/stop/")
@@ -155,10 +156,10 @@ class DialogManager:
         return False
 
     def run_accept(self, save_identical=False):
-        self.log.warn('Running ACCEPT action of {}'.format(self.current_state_name))
+        self.log.warning('Running ACCEPT action of {}'.format(self.current_state_name))
         state = self.get_state()
         if not state.accept:
-            self.log.warn('State does not have an ACCEPT action, we are done.')
+            self.log.warning('State does not have an ACCEPT action, we are done.')
             return
         response, new_state_name = state.accept(
             state=state)  # FIXME <-- don't crash on invalid return value (not iterable)
@@ -180,7 +181,7 @@ class DialogManager:
         return self.move_to(new_state_name)
 
     def check_intent_transition(self):
-        intent = self.context.get('intent', max_age=0)
+        intent = self.context.intent.get()
         if not intent:
             return False
         # Get custom intent transition
