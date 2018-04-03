@@ -8,7 +8,7 @@ import requests
 
 GENEEA_HEADERS = {
     'content-type': 'application/json',
-    'Authorization': 'user_key ' + os.environ.get('GENEEA_API_KEY')
+    'Authorization': 'user_key ' + os.environ.get('GENEEA_API_KEY', "")
 }
 
 
@@ -16,6 +16,9 @@ def extract_tags(title: Optional[str], text: Optional[str]):
     """
     Extracts tags from text using Geneea web service.
     """
+    if 'GENEEA_API_KEY' not in os.environ:
+        return []
+
     message = {
         'returnTextInfo': False,
         "domain": os.environ.get("GENEEA_DOMAIN"),
@@ -37,6 +40,9 @@ def get_sentiment(text: str, full=False):
     """
     Gets sentiment (positive/negative) of a text using Geneea web service.
     """
+    if 'GENEEA_API_KEY' not in os.environ:
+        return None
+
     if type(text) is not str:
         raise Exception('Illegal argument, text not str')
     message = {'returnTextInfo': False, 'text': text}
@@ -48,6 +54,9 @@ def get_sentiment(text: str, full=False):
 
 
 def get_correction(text: str):
+    if 'GENEEA_API_KEY' not in os.environ:
+        return text
+
     data = {
         "text": text,
         "correction": "basic",

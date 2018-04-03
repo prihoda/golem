@@ -63,10 +63,8 @@ def classify_trait(text, entity, threshold):
     """
     entity_dir = os.path.join(NLP_DATA_DIR, 'model', entity)
     pickle_data = pickle.load(open(os.path.join(entity_dir, 'pickle.json'), 'rb'))
-    x, y = pickle_data['x'], pickle_data['y']
-    words, classes = pickle_data['words'], pickle_data['classes']
+    labels = pickle_data['labels']
 
-    logging.info("classifying " + entity_dir + " " + entity + ' with feature count: ' + str(len(words)))
     model = get_model(entity, entity_dir)
     bow = word2vec(text, entity)
     y_pred = model.predict(bow)[0]
@@ -76,7 +74,7 @@ def classify_trait(text, entity, threshold):
     y_pred.sort(key=lambda x: x[1], reverse=True)
 
     if len(y_pred) > 0:
-        value = classes[y_pred[0][0]]
+        value = labels[y_pred[0][0]]
         prob = y_pred[0][1]
         print('> Predicted {}: {} Prob: {}%'.format(entity, value, prob * 100))
         print('All scores > threshold are:', y_pred)
@@ -158,7 +156,7 @@ def test_all():
             model_dir = os.path.join(NLP_DATA_DIR, 'model', entity)
             model = get_model(entity, model_dir)
             pickle_data = pickle.load(open(os.path.join(model_dir, 'pickle.json'), 'rb'))
-            classes = pickle_data['classes']
+            classes = pickle_data['labels']
             x = [word2vec(text, entity) for text, label in examples]
             for text, label in examples:
                 print(text, label)

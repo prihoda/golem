@@ -51,52 +51,74 @@ def process(entities, imputation_rules):
     return words, documents, classes
 
 
-def make_tensors(words, documents, classes):
-    """
-    Processes words into tensors for model training.
-    :returns:   tuple of x, y
-    """
-    glove = utils.get_glove()
-    dim = glove.get_dimension()
-    x, y, junk = [], [], []
+class Batcher:
+    def __init__(self, training, max_words=10):
+        self.glove = utils.get_glove()
+        self.dim = self.glove.get_dimension()
+        self.max_words = max_words
+        self.imputation_rules = cleanup.build_imputation_rules(training.get('imputation', []))
+        data = training['data']
+        self.keep_prob = training.get("dropout", 0.5)
+        self.iterations = training.get("iterations", 3000)
+        self.labels = [x['value'] for x in data]  # TODO what if some are duplicates?
+        self.sentences = dict((x['value'], x['samples']) for x in data)
+        self.sentences.setdefault(None, []).append([])
+        self.unk = self.glove.get_vector("<unk>")
+        if self.unk is None: self.unk = np.zeros([self.dim])
+        self.oov = set()
+        self.sentences = dict(  # converts sentences to embedded feature vectors
+            (k, list(filter(None, [self.process_sentence(sent) for sent in v])))
+            for k, v in self.sentences.items()
+        )
+        # TODO somehow distinguish PAD, END, START, UNK and NIL
 
-    for doc in documents:
-        pattern_words, value = doc
-        labels = [0] * len(classes)
-        if value is not None and value.lower() != 'none':
-            labels[classes.index(value)] = 1
+        if len(self.oov) > 0:
+            print("### [Warning] There are %d out-of-vocabulary words in training data! ###" % len(self.oov))
+            print("OOV words: ", sorted(self.oov))
 
-        features = [np.zeros(dim) for i in range(10)]
-        for idx, word in enumerate(pattern_words):
-            junks = []
-            start_char = -1
-            for i in range(word.count('%')):
-                start_char = word.index("%", start_char + 1)
-                junks.append(start_char)
-            junk.append(junks)
-            vector = glove.get_vector(word.lower())
-            if vector is not None and idx < 10:
-                features[idx] = vector
+    def process_sentence(self, sentence):
+        tokens = cleanup.imputer(cleanup.tokenize(sentence), self.imputation_rules)
+        features = np.zeros([self.max_words, self.dim])
+        random_positions, has_valid_token = [], False
+        for i, token in enumerate(tokens):
+            if token == "%":
+                random_positions.append(i)
+                has_valid_token = True  # well well, but it might get kinda fuzzy ...
             else:
-                print('Unknown word in training data: {} !!!'.format(word))
-                # raise ValueError()
-        if len(features):
-            x.append(features)
-            y.append(labels)
-        else:
-            print('All words of sentence are unknown, skipping!')
-            print('Sentence: {}'.format(doc))
+                vec = self.glove.get_vector(token)
+                if vec is None:
+                    self.oov.add(token)
+                    features[i] = self.unk
+                else:
+                    has_valid_token = True
+                    features[i] = vec
+        if not has_valid_token:
+            print("### [Warning] Sentence \"{}\" has no valid words! Removing! ###".format(sentence))
+        return (features, random_positions) if has_valid_token else None
 
-    return x, y, junk
+    def next_batch(self, batch_size):
+        # ensure proper stratification
+        labels = [random.choice(self.labels) for _ in range(batch_size)]
+        x, y = [], []
+        for i, label in enumerate(labels):
+            sentence, positions = random.choice(self.sentences[label])
+            for pos in positions:
+                sentence[pos] = np.random.random([self.dim])
+            x.append(sentence)
+            one_hot = [0.] * len(self.labels)
+            if label not in [None, 'none', 'None']:
+                one_hot[self.labels.index(label)] = 1.0
+            y.append(one_hot)
+        return x, y
 
 
-def train_entity(x, y, junk, entity_name, entity_dir, num_iterations):
+def train_entity(batcher, entity_name, entity_dir, num_iterations):
     """
     Trains a model for recognizing entity based on x, y.
     """
     print("[Training entity {} for {} iterations]".format(entity_name, num_iterations))
     model = Model(entity_name, entity_dir)
-    model.train(x, y, junk, num_iterations)
+    model.train(batcher, batcher.iterations, batcher.keep_prob)
     model.destroy()
 
 
@@ -146,17 +168,17 @@ def train_all(included=None):
 
             if strategy == 'trait':
                 # train as neural network
-                samples = data['data']
-                imputation = data.get('imputation', [])
-                rules = cleanup.build_imputation_rules(imputation)
+                # samples = data['data']
+                # imputation = data.get('imputation', [])
                 num_iterations = data.get("iterations", 1000)
-                words, documents, classes = process(samples, rules)
-                x, y, junk = make_tensors(words, documents, classes)
+                # words, documents, classes = process(samples, rules)
+                words, documents, classes = [], [], []
                 entity_dir = os.path.join(utils.data_dir(), 'model', entity)
-                train_entity(x, y, junk, entity, entity_dir, num_iterations)
+                batcher = Batcher(data, max_words=10)
+                train_entity(batcher, entity, entity_dir, num_iterations)
                 pickle_path = os.path.join(utils.data_dir(), 'model', entity, 'pickle.json')
-                pickle.dump({'words': words, 'documents': documents, 'classes': classes,
-                             'x': x, 'y': y}, open(pickle_path, 'wb'))
+                pickle.dump({'labels': batcher.labels},
+                            open(pickle_path, 'wb'))
             elif strategy == 'keywords':
                 # train as a list of fixed values (fuzzy matching)
                 samples = data['data']
