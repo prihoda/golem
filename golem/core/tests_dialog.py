@@ -9,8 +9,16 @@ default:
   - name: 'root'
     action: "golem.core.tests_dialog.foo_action"
     require:
-    - FROM: get_location
-    - TO: get_location
+    - slot: WHEN
+      entity: datetime
+    - slot: FROM
+      extractor: POS
+      message: custom_get_location_fn
+    - slot: TO
+      extractor: POS
+      message: 
+        text: "Where do you want to travel?"
+        replies: generator_fn
 
   - name: 'show'
     action:

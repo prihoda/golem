@@ -2,6 +2,7 @@ import importlib
 import re
 from typing import Iterable
 
+from golem.core.responses import AttachmentMessage
 from .templates import Templates
 
 
@@ -73,27 +74,29 @@ def require_one_of(entities=[]):
 
 
 class NewState:
-    def __init__(self, name: str, action, intent=None):
+    def __init__(self, name: str, action, intent=None, requires=None):
         """
         Construct a conversation state.
         :param name:    name of this state
         :param action:  function that will run when moving to this state
         :param intent
+        :param requires
         """
         self.name = str(name)
         self.action = action
         self.intent = intent
+        self.requires = requires
 
     @staticmethod
     def load(definition: dict) -> tuple:
         name = definition['name']
+        action = None
         if 'action' in definition:
             action = definition['action']
             action = NewState.make_action(action)
-        else:
-            action = None  # FIXME nop or what
+        requires = NewState.parse_requirements(definition.get('require'))
         intent = definition.get("intent")
-        s = NewState(name=name, action=action, intent=intent)
+        s = NewState(name=name, action=action, intent=intent, requires=requires)
         return name, s
 
     @staticmethod
@@ -118,8 +121,31 @@ class NewState:
 
     @staticmethod
     def make_default_action(action_dict):
-        # TODO
-        return None
+        from golem.core.responses import TextMessage
+        next = action_dict.get("next")
+        message = None
+        if 'type' in action_dict:
+            type = action_dict['type'].lower()
+            if 'type' == 'qa':
+                if 'context' not in action_dict:
+                    raise ValueError("QA context not set")
+                # TODO
+            elif type == 'free_input': pass
+            elif type == 'seq2seq': pass
+        elif 'text' in action_dict:
+            message = TextMessage(action_dict['text'])
+            if 'replies' in action_dict:
+                message.with_replies(action_dict['replies'])
+        elif 'image_url' in action_dict:
+            message = AttachmentMessage('image', action_dict['image_url'])
+
+        if not message:
+            raise ValueError("Unknown action: {}".format(action_dict))
+        return dynamic_response_fn(message, next)
+
+    @staticmethod
+    def parse_requirements(require_dict):
+        return None  # TODO
 
     def __str__(self):
         return "state:" + self.name
@@ -174,3 +200,9 @@ def load_flows_from_definitions(data: dict):
         flow = NewFlow.load(flow_name, flow_definition)
         flows[flow_name] = flow
     return flows
+
+
+def dynamic_response_fn(messages, next):
+    def fn(dialog):
+        dialog.send_response(messages, next)
+    return fn
