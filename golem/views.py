@@ -262,7 +262,7 @@ def log(request, user_limit):
         }
     })
 
-    user_map = {user['_source']['uid']: {'name' : user['_source']['profile']['first_name'] + ' ' + user['_source']['profile']['last_name'], 'id' : 'uid_'+user['_source']['uid']} for user in res['hits']['hits']}
+    user_map = {user['_source']['uid']: {'name' : user['_source']['profile']['first_name'] + ' ' + user['_source']['profile']['last_name'], 'id' : 'uid_'+user['_source']['uid']} for user in res['hits']['hits'] if user['_source']}
     users = [user_map[u['uid']] if u['uid'] in user_map else {'id':'uid_'+u['uid'], 'name':u['uid']} for u in uids]
 
     context = {
