@@ -1,4 +1,5 @@
 import json
+import logging
 import pickle
 
 from celery.utils.log import get_task_logger
@@ -9,14 +10,12 @@ from golem.core.parsing import date_utils
 from golem.core.parsing.entity_extractor import EntityExtractor
 from golem.core.persistence import get_redis
 
-logger = get_task_logger(__name__)
-
 
 class WitExtractor(EntityExtractor):
 
     def __init__(self):
         super().__init__()
-        logger.info("")
+        self.log = logging.getLogger()
         self.wit_token = settings.GOLEM_CONFIG.get('WIT_TOKEN')
         if not self.wit_token:
             raise ValueError("Wit token not found!")
@@ -26,7 +25,7 @@ class WitExtractor(EntityExtractor):
 
     def extract_entities(self, text: str, max_retries=5):
         if max_retries <= 0:
-            logger.error("Maximal number of Wit retries reached")
+            self.log.error("Maximal number of Wit retries reached")
             return {}
         cached = self._load_from_cache(text)
         if cached: return cached
@@ -36,8 +35,8 @@ class WitExtractor(EntityExtractor):
             entities = self._process_wit_entities(entities)
             self.save_to_cache(text, entities)
             return entities
-        except Exception:
-            logger.exception('Wit error:')
+        except Exception as e:
+            self.log.exception('Wit error:', e)
             return self.extract_entities(text, max_retries - 1)
 
     def _process_wit_entities(self, entities: dict):
@@ -61,7 +60,7 @@ class WitExtractor(EntityExtractor):
                     try:
                         value['metadata'] = json.loads(metadata)
                     except:
-                        logger.warning("Ignoring invalid metadata for entity {}: {}".format(
+                        self.log.warning("Ignoring invalid metadata for entity {}: {}".format(
                             entity, metadata
                         ))
                         value['metadata'] = None
@@ -72,40 +71,40 @@ class WitExtractor(EntityExtractor):
             db = get_redis()
             if db.hexists('wit_cache', text):
                 parsed = pickle.loads(db.hget('wit_cache', text))
-                logger.debug('Got cached wit key: "{}" = {}'.format(self.cache_key, parsed))
+                self.log.debug('Got cached wit key: "{}" = {}'.format(self.cache_key, parsed))
                 return parsed
         return None
 
     def save_to_cache(self, text, entities):
         if self.cache and 'date_interval' not in entities:
             db = get_redis()
-            logger.debug('Caching wit key: {} = {}'.format(text, entities))
+            self.log.debug('Caching wit key: {} = {}'.format(text, entities))
             db.hset('wit_cache', text, pickle.dumps(entities))
 
     def clear_wit_cache(self):
         if self.cache:
-            logger.debug('Clearing Wit cache...')
+            self.log.debug('Clearing Wit cache...')
             db = get_redis()
             db.delete('wit_cache')
 
-# def teach_wit(wit_token, entity, values, doc=""):
-#     import requests
-#     print('*** TEACHING WIT ***')
-#     params = {'v':'20160526'}
-#     print('Inserting values of {}'.format(entity))
-#     rsp = requests.request(
-#         'PUT',
-#         'https://api.wit.ai/entities/'+entity,
-#         headers={
-#             'authorization': 'Bearer ' + wit_token,
-#             'accept': 'application/json'
-#         },
-#         params=params,
-#         json={'doc':doc or entity, 'values':values}
-#     )
-#     if rsp.status_code > 200:
-#         raise ValueError('Wit responded with status: ' + str(rsp.status_code) +
-#                        ' (' + rsp.reason + '): ' + rsp.text)
-#     json = rsp.json()
-#     if 'error' in json:
-#         raise ValueError('Wit responded with an error: ' + json['error'])
+def teach_wit(wit_token, entity, values, doc=""):
+    import requests
+    print('*** TEACHING WIT ***')
+    params = {'v':'20160526'}
+    print('Inserting values of {}'.format(entity))
+    rsp = requests.request(
+        'PUT',
+        'https://api.wit.ai/entities/'+entity,
+        headers={
+            'authorization': 'Bearer ' + wit_token,
+            'accept': 'application/json'
+        },
+        params=params,
+        json={'doc':doc or entity, 'values':values}
+    )
+    if rsp.status_code > 200:
+        raise ValueError('Wit responded with status: ' + str(rsp.status_code) +
+                       ' (' + rsp.reason + '): ' + rsp.text)
+    json = rsp.json()
+    if 'error' in json:
+        raise ValueError('Wit responded with an error: ' + json['error'])

@@ -1,3 +1,5 @@
+from golem.core.chat_session import ChatSession, Profile
+
 class TestInterface():
     name = 'test'
     prefix = 'test'
@@ -10,8 +12,11 @@ class TestInterface():
         TestInterface.states = []
 
     @staticmethod
-    def load_profile(uid):
-        return {'first_name': 'Tests', 'last_name': ''}
+    def fill_session_profile(session: ChatSession):
+        if not session:
+            raise ValueError("Session is None")
+        session.profile = Profile(first_name='Test', last_name='')
+        return session
 
     @staticmethod
     def post_message(session, response):

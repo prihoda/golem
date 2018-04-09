@@ -25,6 +25,7 @@ def process_datetime(values, duration=None):
     append = {'date_interval': []}
     for value in values:
         try:
+            formatted = None
             if value['type'] == 'interval':
                 if 'from' not in value:  # default interval start is now
                     date_from = datetime.datetime.now().replace(tzinfo=pytz.timezone('Europe/Prague'))
@@ -38,12 +39,13 @@ def process_datetime(values, duration=None):
                 if grain == 'week' and date_from == date_this_week(date_from.tzinfo):
                     # change "this week" to next 7 days
                     date_from = timezone.now()
-                    date_to = date_from + timedelta(days=7)
+                    formatted = 'the next seven days'
                 date_to = date_from + timedelta_from_grain(grain)
                 if 'datetime' not in append:
                     append['datetime'] = []
                 append['datetime'].append({'value': date_from, 'grain': grain})
-            formatted = format_date_interval(date_from, date_to, grain)
+            if not formatted:
+                formatted = format_date_interval(date_from, date_to, grain)
             append['date_interval'].append({'value': (date_from, date_to), 'grain': grain, 'formatted': formatted})
         except ValueError:
             logger.exception('Error parsing date: {}'.format(value))

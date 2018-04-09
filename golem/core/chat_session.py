@@ -3,7 +3,7 @@ from golem.core.interfaces.all import create_from_prefix
 
 class ChatSession:
 
-    def __init__(self, interface, unique_id: str, meta=None, profile=None, is_logged=True, is_admin=False):
+    def __init__(self, interface, unique_id: str, meta=None, profile=None, is_logged=True, is_admin=False, is_test=False):
         """
         :param interface: Chat interface object
         :param unique_id: A string that uniquely identifies the user within the interface
@@ -22,6 +22,7 @@ class ChatSession:
         self.meta = meta or {}
         self.is_logged = is_logged
         self.is_admin = is_admin
+        self.is_test = is_test
 
     def to_json(self):
         return {

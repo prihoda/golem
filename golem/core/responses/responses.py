@@ -114,9 +114,9 @@ class TextMessage(MessageElement):
         self.quick_replies.append(quick_reply)
         return self
 
-    def create_quick_reply(self, **kwargs):
+    def create_quick_reply(self, title=None, payload=None, image_url=None):
         from .quick_reply import QuickReply
-        quick_reply = QuickReply(**kwargs)
+        quick_reply = QuickReply(title=title, payload=payload, image_url=image_url)
         return self.add_quick_reply(quick_reply)
 
     def with_replies(self, replies: Iterable):
@@ -128,75 +128,6 @@ class TextMessage(MessageElement):
         for button in buttons:
             self.add_button(button)
         return self
-
-
-class GenericTemplateMessage(MessageElement):
-    """
-    A horizontal list of GenericTemplateElement items.
-    """
-
-    def __init__(self, elements=None):
-        self.elements = [GenericTemplateElement(**element) for element in elements or []]
-
-    def to_response(self):
-        return {
-            "attachment": {
-                "type": "template",
-                "payload": {
-                    "template_type": "generic",
-                    "elements": [element.to_response() for element in self.elements[:10]]
-                }
-            }
-        }
-
-    def __str__(self):
-        text = 'generic template:'
-        for element in self.elements:
-            text += "\n " + str(element)
-        return text
-
-    def add_element(self, element):
-        self.elements.append(element)
-        return self
-
-    def create_element(self, **kwargs):
-        element = GenericTemplateElement(**kwargs)
-        return self.add_element(element)
-
-
-class AttachmentMessage(MessageElement):
-    def __init__(self, attachment_type, url):
-        self.attachment_type = attachment_type
-        self.url = url
-
-    def to_response(self):
-        return {
-            "attachment": {
-                "type": self.attachment_type,
-                "payload": {
-                    "url": self.url
-                }
-            }
-        }
-
-
-# TODO stickers not yet supported by Messenger :(
-# class StickerMessage(MessageElement):
-#    def __init__(self, sticker_id):
-#        self.sticker_id = sticker_id
-#
-#    def to_response(self):
-#        return {
-#            "sticker_id": self.sticker_id
-#        }
-
-
-def _ellipsize(text, max_len=80):
-    if text is None:
-        return None
-    if len(text) >= max_len:
-        return text[:max_len-5] + "..."
-    return text
 
 
 class GenericTemplateElement(MessageElement):
@@ -233,6 +164,75 @@ class GenericTemplateElement(MessageElement):
     def add_button(self, button):
         self.buttons.append(button)
         return self
+
+class GenericTemplateMessage(MessageElement):
+    """
+    A horizontal list of GenericTemplateElement items.
+    """
+
+    def __init__(self, elements=None):
+        self.elements = [GenericTemplateElement(**element) for element in elements or []]
+
+    def to_response(self):
+        return {
+            "attachment": {
+                "type": "template",
+                "payload": {
+                    "template_type": "generic",
+                    "elements": [element.to_response() for element in self.elements[:10]]
+                }
+            }
+        }
+
+    def __str__(self):
+        text = 'generic template:'
+        for element in self.elements:
+            text += "\n " + str(element)
+        return text
+
+    def add_element(self, element):
+        self.elements.append(element)
+        return self
+
+    def create_element(self, **kwargs) -> GenericTemplateElement:
+        element = GenericTemplateElement(**kwargs)
+        self.add_element(element)
+        return element
+
+
+class AttachmentMessage(MessageElement):
+    def __init__(self, attachment_type, url):
+        self.attachment_type = attachment_type
+        self.url = url
+
+    def to_response(self):
+        return {
+            "attachment": {
+                "type": self.attachment_type,
+                "payload": {
+                    "url": self.url
+                }
+            }
+        }
+
+
+# TODO stickers not yet supported by Messenger :(
+# class StickerMessage(MessageElement):
+#    def __init__(self, sticker_id):
+#        self.sticker_id = sticker_id
+#
+#    def to_response(self):
+#        return {
+#            "sticker_id": self.sticker_id
+#        }
+
+
+def _ellipsize(text, max_len=80):
+    if text is None:
+        return None
+    if len(text) >= max_len:
+        return text[:max_len-5] + "..."
+    return text
 
 
 def _get_payload_string(payload):

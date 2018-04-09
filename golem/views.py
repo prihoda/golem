@@ -98,16 +98,15 @@ def run_all_tests(request):
 
     print('Running tests: {}'.format(modules))
     tests = []
+    db = get_redis()
+    db.delete('test_results')
     for module in modules:
         print('Running tests "{}"'.format(module))
-        test = _run_test_module(module)
-        tests.append({'name':module, 'result':test})
+        tests.append(_run_test_module(module))
 
-    results = {'tests':tests, 'updated_time' : str(datetime.datetime.now())}
-    db = get_redis()
-    db.set('test_results', json.dumps(results))
+    db.set('test_time', str(datetime.datetime.now()))
 
-    return JsonResponse(data=results, safe=False)
+    return JsonResponse(data=tests, safe=False)
 
 def _get_test_modules(path):
     from os import listdir
@@ -117,12 +116,16 @@ def _get_test_modules(path):
 @login_required
 def test(request):
     db = get_redis()
-    results = json.loads(db.get('test_results').decode('utf-8'))
+    results = db.hgetall('test_results')
+    results = [json.loads(results[k].decode('utf-8')) for k in sorted(list(results))] if results else []
+
+    updated_time = db.get('test_time')
+    updated_time = db.get('test_time').decode('utf-8') if updated_time else None
 
     status = 'passed'
     avg = {'duration':0, 'total':0, 'init':0, 'parsing':0, 'processing':0}
     passed = 0
-    for test in results['tests']:
+    for test in results:
         result = test['result']
         if result['status'] == 'passed':
             passed += 1
@@ -138,7 +141,7 @@ def test(request):
         for key in avg:
             avg[key] = avg[key] / passed
 
-    context = {'tests':results['tests'], 'avg':avg, 'status':status, 'updated_time' : results['updated_time']}
+    context = {'tests':results, 'avg':avg, 'status':status, 'updated_time' : updated_time}
     template = loader.get_template('golem/test.html')
     return HttpResponse(template.render(context, request))
 
@@ -154,7 +157,12 @@ def _run_test_module(name, benchmark=False):
 
     module = importlib.import_module('tests.'+name)
     importlib.reload(module)
-    return _run_test_actions(name, module.actions, benchmark=benchmark)
+
+    result = _run_test_actions(name, module.actions, benchmark=benchmark)
+    test = {'name':name, 'result':result}
+    db = get_redis()
+    db.hset('test_results', name, json.dumps(test))
+    return test
 
 def _run_test_actions(name, actions, benchmark=False):
     test = ConversationTest(name, actions, benchmark=benchmark)
@@ -276,7 +284,7 @@ def log_conversation(request, group_id=None, page=1):
     if group_id.startswith('test_id'):
         term = {"test_id" : group_id.replace('test_id_','')}
     else:
-        term = { "uid" : group_id }
+        term = { "uid" : group_id.replace('uid_','')}
 
     res = es.search(index="message-log", doc_type='message', body={
        "size": 50,
