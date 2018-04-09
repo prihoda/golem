@@ -25,12 +25,11 @@ class DialogManager:
         self.session = session
         self.uid = session.chat_id  # for backwards compatibility
         self.logger = Logger(session)
-        self.profile = None  # session.interface.load_profile(session.interface)  # FIXME not here
         self.db = get_redis()
         self.log = logging.getLogger()
 
         self.should_log_messages = settings.GOLEM_CONFIG.get('SHOULD_LOG_MESSAGES', False)
-        self.error_message_text = settings.GOLEM_CONFIG.get('ERROR_MESSAGE_TEXT', 'Oh no! You broke me! :(')
+        self.error_message_text = settings.GOLEM_CONFIG.get('ERROR_MESSAGE_TEXT')
 
         entities = {}
         version = self.db.get('dialog_version')
@@ -56,7 +55,7 @@ class DialogManager:
             counter = 0
             history = []
             self.init_flows()
-            self.logger.log_user(self.profile)
+            self.logger.log_user(self.session.profile)
         self.context = Context(entities=entities, history=history, counter=counter, dialog=self)  # type: Context
 
     def init_flows(self):
@@ -272,7 +271,12 @@ class DialogManager:
                 except:
                     pass
                 logging.exception('Exception follows')
-                self.send_response([TextMessage(self.error_message_text)])
+                if self.error_message_text:
+                    self.send_response([self.error_message_text])
+
+                # Raise the error if we are in a test
+                if self.session.is_test:
+                    raise e
 
         self.save_state()
         return True
@@ -314,7 +318,7 @@ class DialogManager:
 
         for response in responses:
             # Log the response
-            self.log.info('Message: {}'.format(response))
+            #self.log.info('Message: {}'.format(response))
             self.logger.log_bot_message(response, self.current_state_name)
 
             text = response.text if hasattr(response, 'text') else (response if isinstance(response, str) else None)

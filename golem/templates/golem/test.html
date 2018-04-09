@@ -24,6 +24,7 @@
           <th>Initializing</th>
           <th>Parsing</th>
           <th>Processing</th>
+          <th>Actions</th>
         </tr>
 
         <tr class="total test-{{ status }}">
@@ -34,6 +35,7 @@
           <td>{{ avg.init | duration }}</td>
           <td>{{ avg.parsing | duration }}</td>
           <td>{{ avg.processing | duration }}</td>
+          <td></td>
         </tr>
 
         {% for test in tests %}
@@ -46,6 +48,7 @@
           <td>{{ test.result.report.avg.init | duration }}</td>
           <td>{{ test.result.report.avg.parsing | duration }}</td>
           <td>{{ test.result.report.avg.processing | duration }}</td>
+          <td><button class="btn btn-xs btn-default run-test" data-module="{{ test.name }}">Run test</button></td>
         </tr>
 
         <tr id="test_{{ test.name }}" class="test-{{ test.result.status }} log hidden">
@@ -76,7 +79,7 @@ $(function(){
   })
 
   $('.run-tests').click(function(){
-    $button = $(this)
+    var $button = $(this)
     $button.text('Running...')
     $.get('/golem/run_all_tests', {}, function(e){
       $button.text('Done.')
@@ -84,6 +87,21 @@ $(function(){
     }).fail(function() {
       alert( "Error running tests" );
     })
+  });
+
+  $('.run-test').click(function(e){
+    $('.run-test').css('visibility','hidden')
+    var $button = $(this)
+    $button.text('Running...')
+    $button.css('visibility','visible')
+    var module = $(this).data('module')
+    $.get('/golem/run_test/'+module, {}, function(e){
+      $button.text('Done.')
+      window.location.reload()
+    }).fail(function() {
+      alert( "Error running test "+module );
+    })
+    e.stopPropagation()
   });
   
 })

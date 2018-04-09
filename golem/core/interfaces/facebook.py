@@ -83,8 +83,9 @@ class FacebookInterface():
             }
             res = requests.get(url, params=params)
             if not res.status_code == requests.codes.ok:
-                print("!!!!!!!!!!!!!!!!!!!!!!! ERROR load_profile " + res.status_code)
-                return None
+                print("!!!!!!!!!!!!!!!!!!!!!!! ERROR load_profile:")
+                print(res)
+                return {}
 
             db.set(key, json.dumps(res.json()), ex=3600 * 24 * 14)  # save value, expire in 14 days
 
