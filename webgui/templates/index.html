@@ -1,0 +1,393 @@
+{% load staticfiles %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golem chatbot</title>
+</head>
+<body>
+<div id="header">
+    <h1>Messages for user {{ uid }}</h1>
+    <div id="button_logout" onclick="logout()">Log out</div>
+</div>
+<div id="list_wrap">
+    <div id="list">
+        {% for m in messages %}
+            <div class="message_container" style="float: {% if m.is_response %} left {% else %} right {% endif %};">
+                {% if m.is_response %}
+                <img class="circle-image" src="{% static bot_img %}"/> {% endif %}
+                <div class="msg" style="text-align: {% if m.is_response %} left {% else %} right {% endif %}">
+                    <div class="bubble"><span class="text">{{ m.text }}</span></div>
+
+                    <div class="msg_elements">
+                        {% for e in m.get_elements %}
+                            <div class="element">
+                                <img src="{{ e.image_url }}"
+                                     onerror="this.onerror=null;this.src='https://placehold.it/300x300'"/>
+                                <h3 class="element_txt">{{ e.title }}</h3>
+                                <p>{{ e.subtitle }}</p>
+                                {% for b in e.buttons %}
+                                    <button>{{ b.text }}</button>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="msg_buttons">
+                        {% for b in m.get_buttons %}
+                            {% if b.action == 'link' %}
+                                <button class="msg_btn" onclick="gourl('{{ b.url }}')">{{ b.text }}</button>
+                            {% elif b.action == 'reply' %}
+                                <button class="msg_btn" onclick="quickreply('{{ b.text }}')">{{ b.text }}</button>
+                            {% elif b.action == 'postback' %}
+                                <button class="msg_btn"
+                                        onclick="postback('{{ b.text }}', '{{ b.url }}')">{{ b.text }}
+                                </button>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                <span class="time"
+                      style="float: {% if m.is_response %} right {% else %} left {% endif %};">[{{ m.get_time }}]</span>
+                {% if not m.is_response %}
+                    <img class="circle-image" src="{% static user_img %}"/> {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+<div id="footer">
+    <form id="form_msg">
+    {% csrf_token %}
+    {{ form }}
+    <input type="submit" value="Send">
+</form>
+</div>
+</body>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+
+<script type="text/javascript">
+    function quickreply(text) {
+        console.log("Quick reply");
+        $.ajax({
+                url: document.URL,
+                type: 'POST',
+                dataType: 'json',
+                data: {
+                    message: text,
+                    csrfmiddlewaretoken: document.getElementsByName('csrfmiddlewaretoken')[0].value
+                }
+            });
+    }
+    function gourl(url) {
+        window.open(url, '_blank');
+    }
+
+    function postback(text, payload) {
+        console.log("Postback");
+        $.ajax({
+            url: document.URL,
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                message: text,
+                postback: JSON.stringify(payload),
+                csrfmiddlewaretoken: document.getElementsByName('csrfmiddlewaretoken')[0].value
+            }
+        });
+    }
+</script>
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        $('#form_msg').submit(function (e) {
+            e.preventDefault();
+            var txt = $('#id_message');
+            $.ajax({
+                url: document.URL,
+                type: 'POST',
+                dataType: 'json',
+                data: {
+                    message: txt.val(),
+                    csrfmiddlewaretoken: document.getElementsByName('csrfmiddlewaretoken')[0].value
+                }
+            });
+            txt.val("")
+        })
+    });
+</script>
+
+<script type="text/javascript">
+    var timestamp = {{ timestamp }};
+    $(window).load(function() {
+        $("#list_wrap").scrollTop($("#list_wrap").prop("scrollHeight"));
+        setTimeout(refresh, 2000);
+    });
+
+    function refresh() {
+        setTimeout(refresh, 2000);
+        $.getJSON("{% url 'last_change' %}", data = {"uid": "{{uid}}"}, function (data) {
+            var timestamp = data['timestamp__max'];
+            if (timestamp > window.timestamp) {
+                console.log('REFRESHING');
+                // change occurred, reload messages
+                $('#list').load(document.URL + ' #list');
+                window.timestamp = timestamp;
+                $("#list_wrap").animate({scrollTop: $("#list_wrap").prop("scrollHeight")}, "slow");
+            }
+        });
+    }
+
+    function logout() {
+        window.location = '{% url 'do_logout' %}'
+    }
+</script>
+
+<style>
+    @import url('https://fonts.googleapis.com/css?family=Roboto');
+
+    body {
+        background-color: #eeeeee;
+        display: flex;
+        height: 100vh;
+        flex-direction: column;
+        margin: 0;
+    }
+
+    #header {
+        position: -webkit-sticky;
+        top: 0;
+        background-color: #00d1eb;
+        box-shadow: 0 4px 12px #aaaaaa;
+        width: 100%;
+        height: auto;
+        z-index: 100;
+    }
+
+    #header > h1 {
+        font-family: "Roboto", sans-serif;
+        text-align: center;
+        font-size: x-large;
+        color: white;
+        padding: 5px 10%;
+        font-weight: 500;
+        z-index: 10;
+        display: inline-block;
+    }
+
+    #footer {
+        width: 100vw;
+        position: -webkit-sticky;
+        bottom: 0;
+        padding: 10px 0;
+        background-color: white;
+        z-index: 100;
+    }
+
+    #list_wrap {
+        background-color: white;
+        width: 100vw;
+        height: available;
+        margin: 0 auto;
+        overflow-x: auto;
+        overflow-y: scroll;
+    }
+
+    #list {
+        width: 80vw;
+        margin-left: auto;
+        margin-right: auto;
+        max-width: 1366px;
+    }
+
+    #button_logout {
+        float: right;
+        background-color: white;
+        text-transform: uppercase;
+        font-weight: 700;
+        font-family: "Roboto", 'sans-serif';
+        color: #222222;
+        border: none;
+        font-size: small;
+        border-radius: 2px;
+        padding: 12px;
+        margin: 10px;
+    }
+
+    #button_logout:focus, #button_logout:hover {
+        background-color: #eaeaea;
+    }
+
+    .message_container {
+        font-family: "Roboto", sans-serif;
+        font-weight: 400;
+        margin: 5px;
+        clear: both;
+    }
+
+    .time {
+        color: #8c8c8c;
+        font-weight: 400;
+        font-size: small;
+    }
+
+    #form_msg {
+        float: right;
+        font-family: Roboto, sans-serif;
+        {#margin-right: 10%;#}
+        width: 100%;
+    }
+
+    .circle-image {
+        width: 48px;
+        height: 48px;
+        border-radius: 100%;
+        position: relative;
+        display: inline-block;
+    {#        background-color: #eaeaea;#}
+    }
+
+    .msg {
+        position: relative;
+        display: inline-block;
+    }
+
+    .msg > .text {
+        background-color: #00d1eb;
+        color: white;
+        padding: 8px;
+        border-radius: 20px;
+        z-index: 0;
+        line-height: 200%;
+    }
+
+    .bubble {
+        background-color: #00d1eb;
+        color: white;
+        padding: 8px 24px;
+        margin-left: 16px;
+        margin-right: 16px;
+        border-radius: 20px;
+        z-index: 0;
+    {#        line-height: 200%; TODO add this it looks cool #}
+    }
+
+    .msg + .time {
+        display: none;
+        background-color: transparent;
+    }
+
+    .msg:hover + .time {
+
+        display: inline-block;
+        position: relative;
+        background-color: #bbbbbb;
+        color: white;
+        padding: 10px;
+        border-radius: 8px;
+    }
+
+    .msg_btn {
+        background-color: #eeeeee;
+        padding: 6px;
+        margin: 5px 5px;
+        border: none;
+        border-radius: 8px;
+    }
+
+    .msg_btn:focus, .msg_btn:hover {
+        background-color: #dddddd;
+    }
+
+    .element {
+        width: 250px;
+        position: relative;
+        background: #ececec;
+        border: solid 2px #dddddd;
+        margin: 5px;
+        display: inline;
+    }
+
+    .element > img {
+        margin-left: 20%;
+        margin-right: 20%;
+        height: 150px;
+        width: auto;
+    }
+
+    .element > p {
+        padding-left: auto;
+        padding-right: auto;
+        text-align: center;
+        color: #777777;
+    }
+
+    .element_txt {
+        z-index: 100;
+        color: #333;
+        font-size: 100%;
+        font-weight: 400;
+        margin-top: auto;
+        margin-bottom: auto;
+        text-align: center;
+    }
+
+    .msg_elements {
+        width: 100%;
+        display: inline-flex;
+        height: auto;
+        margin-right: auto;
+        margin-left: auto;
+    }
+
+    input[type='submit'] {
+        background-color: white;
+        text-transform: uppercase;
+        font-weight: 700;
+        font-family: "Roboto", 'sans-serif';
+        color: #222222;
+        border: none;
+        border-radius: 2px;
+        padding: 12px;
+        box-shadow: 0 5px 10px #aaaaaa;
+    }
+
+    input[type='submit']:focus, input[type='submit']:hover {
+        background-color: #eaeaea;
+        box-shadow: 0 5px 10px #777777;
+    }
+
+    input[type="text"] {
+        padding: 10px;
+        border: none;
+        border-bottom: 1px solid #bcbcbc;
+        font-family: "Roboto", 'sans-serif';
+        background-color: white;
+        box-shadow: 0 3px 10px #aaaaaa;
+        color: #777777;
+        -webkit-transition: box-shadow 0.3s, border 0.3s;
+        -moz-transition: box-shadow 0.3s, border 0.3s;
+        -ms-transition: box-shadow 0.3s, border 0.3s;
+        -o-transition: box-shadow 0.3s, border 0.3s;
+        transition: box-shadow 0.3s, border 0.3s;
+        width: 90%;
+    }
+
+    #form_msg > label {
+        color: transparent;
+    }
+
+    input[type="text"]:focus {
+        border-bottom: 2px solid #00d1eb;
+        color: #222222;
+        background-color: white;
+        box-shadow: 0 3px 1px #aaaaaa;
+        outline: none;
+        -webkit-transition: border 0.3s;
+        -moz-transition: border 0.3s;
+        -ms-transition: border 0.3s;
+        -o-transition: border 0.3s;
+        transition: border 0.3s;
+    }
+
+</style>

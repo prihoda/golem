@@ -1,19 +1,24 @@
-from .message_parser import parse_text_message
-from .interfaces.test import TestInterface
-from .serialize import json_serialize, json_deserialize
-from golem.core.responses import *
-from golem.core.persistence import get_redis
 import json
 import time
-from django.conf import settings  
 import random
+
+from golem.core.persistence import get_redis
+from golem.core.responses.responses import *
+from golem.core.responses.buttons import *
+from django.conf import settings
+from .interfaces.test import TestInterface
+from .message_parser import parse_text_message
+from .serialize import json_deserialize
+from .chat_session import ChatSession
+
 
 class ConversationTestException(Exception):
     def __init__(self, message):
         super(ConversationTestException, self).__init__(message)
 
 class UserMessage:
-    pass
+    def get_parsed(self):
+        pass
 
 class UserTextMessage(UserMessage):
     def __init__(self, text):
@@ -25,9 +30,12 @@ class UserTextMessage(UserMessage):
         return self
 
     def get_parsed(self):
-        parsed = parse_text_message(self.text)
         TestLog.log('Sending user message "{}".'.format(self.text))
-        
+        parsed = parse_text_message(self.text)
+
+        for entity, values in parsed['entities'].items():
+            TestLog.log('- Entity {}: {}'.format(entity, values))
+
         for entity in self.entities:
             expected_value = self.entities[entity]
             if entity not in parsed['entities']:
@@ -78,7 +86,7 @@ class BotMessage():
         if not isinstance(message, self.klass):
             raise ConversationTestException('- Expected message type {} but received {} from bot: "{}".'.format(self.klass.__name__, type(message).__name__, message))
         
-        TestLog.log('- Received expected {} from bot: "{}".'.format(self.klass.__name__, message))
+        TestLog.log('- Checking received {} from bot: "{}".'.format(self.klass.__name__, message))
 
         if self.text:
             if not isinstance(message, TextMessage):
@@ -109,9 +117,10 @@ class StateChange():
 class ConversationTest:
     def __init__(self, name, actions, benchmark=False):
         self.benchmark = benchmark
-        self.uid = 'benchmark_'+str(random.randint(1, 10000000)) if benchmark else 'test'
+        self.chat_id = 'benchmark_'+str(random.randint(1, 10000000)) if benchmark else 'test'
         self.name = name
         self.actions = actions
+        self.session = ChatSession(unique_id=self.chat_id, interface=TestInterface, is_logged=not self.benchmark, is_test=True)
 
     def run(self):
         self.init()
@@ -134,7 +143,7 @@ class ConversationTest:
     def init(self):
         self.buttons = {}
         from .dialog_manager import DialogManager
-        DialogManager.clear_uid(self.uid)
+        DialogManager.clear_chat(self.session.chat_id)
         TestLog.clear()
         TestInterface.clear()
         
@@ -149,8 +158,8 @@ class ConversationTest:
 
         if isinstance(action, UserMessage):
             from .dialog_manager import DialogManager
-            start_time = time.time()
-            dialog = DialogManager(uid=self.uid, interface=TestInterface, test_id=self.name, use_logging=not self.benchmark)
+            start_time = time.time() # test_id=self.name, use_logging=not self.benchmark
+            dialog = DialogManager(session=self.session)
             time_init = time.time() - start_time
             start_time = time.time()
             parsed = action.get_parsed()
@@ -179,11 +188,11 @@ class ConversationTest:
             if isinstance(message, GenericTemplateMessage):
                 for element in message.elements:
                     buttons += element.buttons
-            for button in buttons:
-                if button.payload:
-                    button.payload['_log_text'] = button.title
-                print('Adding button {}'.format(button.title))
-                self.buttons[button.title] = {'payload':button.payload, 'url':getattr(button, 'url', None)}
+            for button_qr in buttons:
+                if hasattr(button_qr, 'payload') and button_qr.payload:
+                    button_qr.payload['_log_text'] = button_qr.title
+                print('Adding button {}'.format(button_qr.title))
+                self.buttons[button_qr.title] = {'payload':getattr(button_qr, 'payload', None), 'url': getattr(button_qr, 'url', None)}
 
         if isinstance(action, StateChange):
             state = TestInterface.states.pop(0) if TestInterface.states else None

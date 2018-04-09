@@ -1,18 +1,25 @@
-from django.http.response import HttpResponse, JsonResponse
-from django.template import loader
-from golem.core.persistence import get_redis,get_elastic
-from golem.core.tests import ConversationTest, ConversationTestRecorder, ConversationTestException, TestLog, UserTextMessage
+import datetime
 import json
+import logging
 import time
 import traceback
-import datetime
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-from django.views import generic
-from django.conf import settings  
-from golem.core.interfaces.telegram import TelegramInterface
-from golem.core.interfaces.facebook import FacebookInterface
+
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.http.response import HttpResponse, JsonResponse
+from django.shortcuts import render
+from django.template import loader
+from django.utils.decorators import method_decorator
+from django.views import generic
+from django.views.decorators.csrf import csrf_exempt
+
+from golem.core.interfaces.facebook import FacebookInterface
+from golem.core.interfaces.microsoft import MicrosoftInterface
+from golem.core.interfaces.telegram import TelegramInterface
+from golem.core.persistence import get_elastic, get_redis
+from golem.core.tests import ConversationTest, ConversationTestRecorder, ConversationTestException, TestLog, \
+    UserTextMessage
+
 
 class FacebookView(generic.View):
 
@@ -53,22 +60,53 @@ class TelegramView(generic.View):
         TelegramInterface.accept_request(request_body)
         return HttpResponse()
 
+
+class GActionsView(generic.View):
+    def get(self, request, *args, **kwargs):
+        return HttpResponse()
+
+    @method_decorator(csrf_exempt)
+    def dispatch(self, request, *args, **kwargs):
+        return generic.View.dispatch(self, request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        from golem.core.interfaces.gactions import GActionsInterface
+        body = json.loads(self.request.body.decode('utf-8'))
+        logging.critical(body)
+        GActionsInterface.accept_request(body)
+        return HttpResponse()
+
+
+class SkypeView(generic.View):
+    def get(self, request, *args, **kwargs):
+        body = json.loads(self.request.body.decode('utf-8'))
+        MicrosoftInterface.accept_request(body)
+        return HttpResponse()
+
+    def post(self, request, *args, **kwargs):
+        body = json.loads(self.request.body.decode('utf-8'))
+        MicrosoftInterface.accept_request(body)
+        return HttpResponse()
+
+    @method_decorator(csrf_exempt)
+    def dispatch(self, request, *args, **kwargs):
+        return generic.View.dispatch(self, request, *args, **kwargs)
+
 @login_required
 def run_all_tests(request):
     modules = _get_test_modules('./tests/')
 
     print('Running tests: {}'.format(modules))
     tests = []
+    db = get_redis()
+    db.delete('test_results')
     for module in modules:
         print('Running tests "{}"'.format(module))
-        test = _run_test_module(module)
-        tests.append({'name':module, 'result':test})
+        tests.append(_run_test_module(module))
 
-    results = {'tests':tests, 'updated_time' : str(datetime.datetime.now())}
-    db = get_redis()
-    db.set('test_results', json.dumps(results))
+    db.set('test_time', str(datetime.datetime.now()))
 
-    return JsonResponse(data=results, safe=False)
+    return JsonResponse(data=tests, safe=False)
 
 def _get_test_modules(path):
     from os import listdir
@@ -78,12 +116,16 @@ def _get_test_modules(path):
 @login_required
 def test(request):
     db = get_redis()
-    results = json.loads(db.get('test_results').decode('utf-8'))
+    results = db.hgetall('test_results')
+    results = [json.loads(results[k].decode('utf-8')) for k in sorted(list(results))] if results else []
+
+    updated_time = db.get('test_time')
+    updated_time = db.get('test_time').decode('utf-8') if updated_time else None
 
     status = 'passed'
     avg = {'duration':0, 'total':0, 'init':0, 'parsing':0, 'processing':0}
     passed = 0
-    for test in results['tests']:
+    for test in results:
         result = test['result']
         if result['status'] == 'passed':
             passed += 1
@@ -99,7 +141,7 @@ def test(request):
         for key in avg:
             avg[key] = avg[key] / passed
 
-    context = {'tests':results['tests'], 'avg':avg, 'status':status, 'updated_time' : results['updated_time']}
+    context = {'tests':results, 'avg':avg, 'status':status, 'updated_time' : updated_time}
     template = loader.get_template('golem/test.html')
     return HttpResponse(template.render(context, request))
 
@@ -112,11 +154,15 @@ def run_test_message(request, message):
 
 def _run_test_module(name, benchmark=False):
     import importlib
-    import imp
 
     module = importlib.import_module('tests.'+name)
-    imp.reload(module)
-    return _run_test_actions(name, module.actions, benchmark=benchmark)
+    importlib.reload(module)
+
+    result = _run_test_actions(name, module.actions, benchmark=benchmark)
+    test = {'name':name, 'result':result}
+    db = get_redis()
+    db.hset('test_results', name, json.dumps(test))
+    return test
 
 def _run_test_actions(name, actions, benchmark=False):
     test = ConversationTest(name, actions, benchmark=benchmark)
@@ -234,10 +280,12 @@ def log_conversation(request, group_id=None, page=1):
         return HttpResponse()
 
     term = {}
-    if group_id.startswith('uid_'):
-        term = { "uid" : group_id.replace('uid_','') }
-    elif group_id.startswith('test_id'):
+
+    if group_id.startswith('test_id'):
         term = {"test_id" : group_id.replace('test_id_','')}
+    else:
+        term = { "uid" : group_id.replace('uid_','')}
+
     res = es.search(index="message-log", doc_type='message', body={
        "size": 50,
        "from" : 50*(page-1),
@@ -276,3 +324,12 @@ def debug(request):
     FacebookInterface.accept_request({'entry':[{'messaging':[{'message': {'seq': 356950, 'mid': 'mid.$cAAPhQrFuNkFibcXMZ1cPICEB8YUn', 'text': 'hi'}, 'recipient': {'id': '1092102107505462'}, 'timestamp': 1595663674471, 'sender': {'id': '1046728978756975'}}]}]})
 
     return HttpResponse('done')
+
+
+def users_view(request):
+    from golem.models import User
+    offset = int(request.GET.get("offset", 0))
+    limit = int(request.GET.get("limit", 50))
+    users = User.objects.all().order_by("uid")[offset:limit + offset]
+    context = {"users": users, "next_offset": offset + limit, "prev_offset": offset - limit}
+    return render(request, "golem/users.html", context)

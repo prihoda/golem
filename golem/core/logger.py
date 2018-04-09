@@ -1,14 +1,16 @@
-from .responses import MessageElement
 import json
 import time
+
+from golem.core.chat_session import ChatSession, Profile
 from golem.core.persistence import get_elastic
+from .responses.responses import MessageElement
 
 class Logger:
-    def __init__(self, uid, interface, test_id=None, enabled=True):
-        self.uid = uid
-        self.test_id = test_id
-        self.interface = interface
-        self.enabled = enabled
+    def __init__(self, session: ChatSession):
+        self.uid = session.chat_id
+        self.test_id = -1
+        self.interface = session.interface
+        self.enabled = bool(get_elastic())
 
     def log_user_message(self, type_, entities, accepted_time, state):
         #es = get_elastic()
@@ -74,12 +76,12 @@ class Logger:
         except:
             print('Unable to log message to Elasticsearch.')
 
-    def log_user(self, profile):
+    def log_user(self, profile: Profile):
         if not self.enabled:
             return
         user = {
             'uid' : self.uid,
-            'profile': profile
+            'profile': profile.to_json()
         }
         es = get_elastic()
         if not es:
