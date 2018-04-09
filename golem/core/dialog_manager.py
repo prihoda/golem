@@ -80,6 +80,7 @@ class DialogManager:
         db.hdel('session_context', chat_id)
 
     def move_by_entities(self, entities):
+        self.log.warning("Not accepted, moving to default.root!")
         self.move_to('default.root')
         # TODO instead of this, first check for states in this flow that accept the entity
         # TODO then check for states in default flow OR check for flows that accept it
@@ -109,8 +110,8 @@ class DialogManager:
 
         if not self.check_state_transition():
             if not self.check_intent_transition():
-                print("FOO", entities.keys())  # FIXME
-                if self.get_state().accepts_message(entities.keys()):
+                # print("FOO", entities.keys())  # FIXME
+                if self.get_flow().accepts_message(entities.keys() - '_message_text'):
                     self.run_accept(save_identical=True)
                     self.save_state()
                 else:
@@ -168,14 +169,15 @@ class DialogManager:
         return False
 
     def run_accept(self, save_identical=False):
-        self.log.info('Running action of state {}'.format(self.current_state_name))
         state = self.get_state()
-        if not state.action:
-            self.log.warning('State does not have an action.')
-            return
-        state.action(dialog=self)
-        # self.send_response(response)
-        # self.move_to(new_state_name, save_identical=save_identical)
+        if self.current_state_name != 'default.root' and not state.check_requirements(self.context):
+            requirement = state.get_first_requirement(self.context)
+            requirement.action(dialog=self)
+        else:
+            if not state.action:
+                self.log.warning('State does not have an action.')
+                return
+            state.action(dialog=self)
 
     def run_init(self):
         self.run_accept()
@@ -229,7 +231,7 @@ class DialogManager:
         flow = self.get_flow(flow_name)
         return flow.get_state(state_name) if flow else None
 
-    def move_to(self, new_state_name, initializing=False, save_identical=False):
+    def move_to(self, new_state_name, initializing=False, save_identical=False, run_action=True):
         # if flow prefix is not present, add the current one
         action = 'init'
         if isinstance(new_state_name, int):
@@ -264,13 +266,8 @@ class DialogManager:
             try:
                 logging.error(previous_state)
                 logging.error(new_state_name)
-                if previous_state != new_state_name:
-                    new_state = self.get_state(new_state_name)
-                    if new_state.check_requirements():
-                        self.run_accept()
-                    else:
-                        requirement = new_state.get_first_requirement()
-                        requirement.action(self)
+                if previous_state != new_state_name and run_action:
+                    self.run_accept()
 
             except Exception as e:
                 logging.error('*****************************************************')
@@ -302,7 +299,7 @@ class DialogManager:
         session = json.dumps(self.session.to_json())
         self.db.hset("chat_session", self.session.chat_id, session)
 
-    def send_response(self, responses, next=None):
+    def send_response(self, responses, next=None, run_next=True):
         if not responses:
             return
         self.log.info('-- CHATBOT message -------------------------------')
@@ -331,4 +328,4 @@ class DialogManager:
                 message_logger.on_message.delay(self.session, text, self, from_user=False)
 
         if next is not None:
-            self.move_to(next)
+            self.move_to(next, run_action=run_next)
