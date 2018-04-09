@@ -284,7 +284,7 @@ def log_conversation(request, group_id=None, page=1):
     if group_id.startswith('test_id'):
         term = {"test_id" : group_id.replace('test_id_','')}
     else:
-        term = { "uid" : group_id }
+        term = { "uid" : group_id.replace('uid_','')}
 
     res = es.search(index="message-log", doc_type='message', body={
        "size": 50,
