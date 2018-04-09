@@ -76,6 +76,9 @@ class Context(object):
             return super.__getattribute__(super, item)
         return Context.Query(self, item, self.entities.get(item))
 
+    def __contains__(self, entity):
+        return entity in self.entities
+
     def to_dict(self):
         return {
             'history': self.history,

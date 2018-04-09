@@ -35,12 +35,6 @@ class Seq2Seq:
             weights=tf.ones([logits.shape[0], logits.shape[1]])
         )
 
-    def get_word_lengths(self, batch):
-        raise Exception('dont use me')
-        nonzero = tf.sign(tf.reduce_max(tf.abs(batch), axis=2))  # number of filled features
-        length = tf.cast(tf.reduce_sum(nonzero, axis=1), tf.int32)  # as int
-        return length
-
     def get_last_component(self, lstm_output, length):
         batch_size = tf.shape(lstm_output)[0]
         max_length = tf.shape(lstm_output)[1]

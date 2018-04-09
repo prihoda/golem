@@ -11,12 +11,12 @@ default:
     require:
     - slot: WHEN
       entity: datetime
+      action:
+        text: When?
     - slot: FROM
-      extractor: POS
-      message: custom_get_location_fn
+      action: "golem.core.tests_dialog.foo_action"
     - slot: TO
-      extractor: POS
-      message: 
+      action: 
         text: "Where do you want to travel?"
         replies: generator_fn
 
@@ -54,6 +54,17 @@ generative:
     action:
       type: 'seq2seq'
       from: 'my_nn_weights_1'
+"""
+
+
+FILTERING_EXAMPLE_YAML = """
+greeting:
+    states:
+    - name: morning
+      action:
+        text: "Good morning!"
+      on:
+        datetime: TODO bind predicates from python 
 """
 
 

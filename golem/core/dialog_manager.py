@@ -79,6 +79,11 @@ class DialogManager:
         db.hdel('session_state', chat_id)
         db.hdel('session_context', chat_id)
 
+    def move_by_entities(self, entities):
+        self.move_to('default.root')
+        # TODO instead of this, first check for states in this flow that accept the entity
+        # TODO then check for states in default flow OR check for flows that accept it
+
     def process(self, message_type, entities):
         self.session.interface.processing_start(self.session)
         accepted_time = time.time()
@@ -104,9 +109,13 @@ class DialogManager:
 
         if not self.check_state_transition():
             if not self.check_intent_transition():
-                # run the action
-                self.run_accept(save_identical=True)
-                self.save_state()
+                print("FOO", entities.keys())  # FIXME
+                if self.get_state().accepts_message(entities.keys()):
+                    self.run_accept(save_identical=True)
+                    self.save_state()
+                else:
+                    self.move_by_entities(entities)
+                    self.save_state()
 
         self.session.interface.processing_end(self.session)
 
@@ -256,7 +265,12 @@ class DialogManager:
                 logging.error(previous_state)
                 logging.error(new_state_name)
                 if previous_state != new_state_name:
-                    self.run_accept()
+                    new_state = self.get_state(new_state_name)
+                    if new_state.check_requirements():
+                        self.run_accept()
+                    else:
+                        requirement = new_state.get_first_requirement()
+                        requirement.action(self)
 
             except Exception as e:
                 logging.error('*****************************************************')
