@@ -81,7 +81,7 @@ class DialogManager:
 
     def move_by_entities(self, entities):
         self.log.warning("Not accepted, moving to default.root!")
-        self.move_to('default.root')
+        self.move_to('default.root:accept')
         # TODO instead of this, first check for states in this flow that accept the entity
         # TODO then check for states in default flow OR check for flows that accept it
 
@@ -96,6 +96,8 @@ class DialogManager:
         self.log.info('-- USER message ----------------------------------')
 
         # if message_type != 'schedule':
+        # TODO don't increment when @ requires -> input and it's valid
+        # TODO what to say and do on invalid requires -> input?
         self.context.counter += 1
 
         entities = self.context.add_entities(entities)
@@ -110,11 +112,14 @@ class DialogManager:
 
         if not self.check_state_transition():
             if not self.check_intent_transition():
-                # print("FOO", entities.keys())  # FIXME
-                if self.get_flow().accepts_message(entities.keys() - '_message_text'):
+                # TODO somebody might want _message_text and intent locked for freetext/human
+                acceptable_entities = list(filter(lambda e: e.startswith("_"), entities.keys()))
+                # blame the dialog designer for bad postbacks ... but it's a good idea to prefix special entities with _
+                if message_type != 'message' or self.get_flow().accepts_message(acceptable_entities):
                     self.run_accept(save_identical=True)
                     self.save_state()
                 else:
+                    self.log.debug("Unsupported entity, moving to default.root")
                     self.move_by_entities(entities)
                     self.save_state()
 
@@ -171,6 +176,8 @@ class DialogManager:
     def run_accept(self, save_identical=False):
         state = self.get_state()
         if self.current_state_name != 'default.root' and not state.check_requirements(self.context):
+            # TODO should they be checked when moving or always?
+            # TODO i would go with always as the user's code might depend on the entities being non-null
             requirement = state.get_first_requirement(self.context)
             requirement.action(dialog=self)
         else:
@@ -179,19 +186,8 @@ class DialogManager:
                 return
             state.action(dialog=self)
 
-    def run_init(self):
-        self.run_accept()
-        # self.log.warning('Running INIT action of {}'.format(self.current_state_name))
-        # state = self.get_state()
-        # if not state.init:
-        #     self.log.warning('State does not have an INIT action, we are done.')
-        #     return
-        # response, new_state_name = state.init(state=state)
-        # self.send_response(response)
-        # self.move_to(new_state_name)
-
     def check_state_transition(self):
-        new_state_name = self.context.get('_state', max_age=0)
+        new_state_name = self.context._state.get() #get('_state', max_age=0)
         return self.move_to(new_state_name)
 
     def check_intent_transition(self):
@@ -219,7 +215,7 @@ class DialogManager:
 
         # new_state_name = new_state_name + ':accept'
         self.log.info('Moving based on intent %s...' % intent)
-        return self.move_to(new_state_name)
+        return self.move_to(new_state_name + ":")  # : runs the action
 
     def get_flow(self, flow_name=None):
         if not flow_name:
@@ -231,7 +227,7 @@ class DialogManager:
         flow = self.get_flow(flow_name)
         return flow.get_state(state_name) if flow else None
 
-    def move_to(self, new_state_name, initializing=False, save_identical=False, run_action=True):
+    def move_to(self, new_state_name, initializing=False, save_identical=False):
         # if flow prefix is not present, add the current one
         action = 'init'
         if isinstance(new_state_name, int):
@@ -266,7 +262,7 @@ class DialogManager:
             try:
                 logging.error(previous_state)
                 logging.error(new_state_name)
-                if previous_state != new_state_name and run_action:
+                if previous_state != new_state_name and action != 'init':
                     self.run_accept()
 
             except Exception as e:
@@ -299,7 +295,7 @@ class DialogManager:
         session = json.dumps(self.session.to_json())
         self.db.hset("chat_session", self.session.chat_id, session)
 
-    def send_response(self, responses, next=None, run_next=True):
+    def send_response(self, responses, next=None):
         if not responses:
             return
         self.log.info('-- CHATBOT message -------------------------------')
@@ -328,4 +324,4 @@ class DialogManager:
                 message_logger.on_message.delay(self.session, text, self, from_user=False)
 
         if next is not None:
-            self.move_to(next, run_action=run_next)
+            self.move_to(next)  # TODO we can either have ':init' or a bool parameter

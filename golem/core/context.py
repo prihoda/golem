@@ -99,27 +99,39 @@ class Context(object):
 
         current_state = self.get_history_state(0)
         # add all new entities
-        for entity_name, values in new_entities.items():
+        for entity_name, entity_values in new_entities.items():
             # allow also direct passing of {'entity' : 'value'}
-            if not isinstance(values, dict) and not isinstance(values, list):
-                values = {'value': values}
-            if not isinstance(values, list):
-                values = [values]
-            
+
+            if not isinstance(entity_values, dict) and not isinstance(entity_values, list):
+                entity_values = {'value': entity_values}
+            if not isinstance(entity_values, list):
+                entity_values = [entity_values]
+
+            # FIXME use a factory to build the correct subclass with right arguments
+
             # prepend each value to start of the list with 0 age
-            for value in values:
-                # FIXME use a factory to build the correct subclass with right arguments
-                entity = Entity(
-                    name=entity_name,
-                    value=value.get('value'),
-                    raw=value,
-                    counter=self.counter,
-                    scope=None,
-                    state=current_state,
-                    )
-                self.entities.setdefault(entity_name, []).insert(0, entity)
+            for value in entity_values:
+                self.add_entity_dict(entity_name, value, current_state)
         self.debug()
         return new_entities
+
+    def add_entity_dict(self, entity_name, entity_dict, state):
+        if 'value' in entity_dict:
+            entity = Entity(
+                name=entity_name,
+                value=entity_dict['value'], raw=entity_dict,
+                counter=self.counter, scope=None, state=state,
+            )
+            self.entities.setdefault(entity_name, []).insert(0, entity)
+        if 'values' in entity_dict:  # compound entities
+            for item in entity_dict['values']:
+                for role, entity in item.items():
+                    entity = Entity(
+                        name=entity_name + "__" + role,
+                        value=entity.get("value"), raw=entity,
+                        counter=self.counter, scope=None, state=state
+                    )
+                    self.entities.setdefault(entity_name + "__" + role, []).insert(0, entity)
 
     def add_state(self, state_name):
         timestamp = int(time.time())
