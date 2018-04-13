@@ -12,7 +12,7 @@ from golem.core.responses.responses import TextMessage
 from golem.tasks import accept_inactivity_callback, accept_schedule_callback
 from .context import Context
 from .flow import Flow
-from .logger import Logger
+from .logger import ElasticsearchLogger, MessageLogging
 from .persistence import get_redis
 from .serialize import json_deserialize, json_serialize
 from .tests import ConversationTestRecorder
@@ -24,7 +24,8 @@ class DialogManager:
     def __init__(self, session: ChatSession):
         self.session = session
         self.uid = session.chat_id  # for backwards compatibility
-        self.logger = Logger(session)
+        self.logger = ElasticsearchLogger(session)
+        self.message_logging = MessageLogging(self)
         self.db = get_redis()
         self.log = logging.getLogger()
 
@@ -111,7 +112,7 @@ class DialogManager:
         self.session.interface.processing_end(self.session)
 
         # leave logging message to the end so that the user does not wait
-        self.logger.log_user_message(message_type, entities, accepted_time, accepted_state)
+        self.message_logging.log_user_message(message_type, entities, accepted_time, accepted_state)
 
     def schedule(self, callback_name, at=None, seconds=None):
         self.log.info('Scheduling callback "{}": at {} / seconds: {}'.format(callback_name, at, seconds))
@@ -319,8 +320,9 @@ class DialogManager:
         for response in responses:
             # Log the response
             #self.log.info('Message: {}'.format(response))
-            self.logger.log_bot_message(response, self.current_state_name)
+            # self.logger.log_bot_message(response, self.current_state_name)
+            self.message_logging.log_bot_message(response, self.current_state_name)
 
-            text = response.text if hasattr(response, 'text') else (response if isinstance(response, str) else None)
-            if text and self.should_log_messages:
-                message_logger.on_message.delay(self.session, text, self, from_user=False)
+            # text = response.text if hasattr(response, 'text') else (response if isinstance(response, str) else None)
+            # if text and self.should_log_messages:
+            #     message_logger.on_message.delay(self.session, text, self, from_user=False)
