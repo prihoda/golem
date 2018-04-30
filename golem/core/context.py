@@ -1,67 +1,16 @@
 import time
+from typing import Union
+
+from functools import reduce
+
+from collections import Iterable
 
 from golem.core.entities import Entity
+from golem.core.entity_query import EntityQuery
+from golem.core.entity_value import EntityValue
 
 
 class Context(object):
-
-    # inside class context on purpose!
-    class Query:
-        def __init__(self, context, key, candidates):
-            self.context = context
-            self.key = key
-            self.candidates = candidates or []
-
-        def last(self):
-            return self.candidates[0].value if self.candidates else None
-
-        def first(self):
-            return self.candidates[-1].value if self.candidates else None
-
-        def all(self):
-            return self.candidates
-
-        def get(self):
-            newest = self.candidates[0] if self.candidates else None
-            if newest and newest.get_age(self.context.counter) == 0:
-                return newest.value
-            return None
-
-        def count(self):
-            return len(self.candidates)
-
-        def __nonzero__(self):
-            return self.count() > 0
-
-        def _age_filter(self, min=None, max=None):
-            now = self.context.counter
-            self.candidates = list(filter(
-                lambda x: (min is None or min <= x.get_age(now)) and (max is None or x.get_age(now) <= max),
-                self.candidates
-            ))
-
-        def where(self, **kwargs):
-            for k, v in kwargs.items():
-                property, operation = k.rsplit('__', maxsplit=1)
-                if property == "age":
-                    v = int(v)
-                    if operation == "lt":
-                        self._age_filter(max=v-1)
-                    elif operation == "lte":
-                        self._age_filter(max=v)
-                    elif operation == "eq":
-                        self._age_filter(min=v, max=v)
-                    elif operation == "gte":
-                        self._age_filter(min=v)
-                    elif operation == "gt":
-                        self._age_filter(min=v+1)
-                else:
-                    raise NotImplementedError()
-
-            return self
-
-    class MockQuery(Query):
-        pass  # TODO for testing
 
     def __init__(self, dialog, entities, history, counter, max_depth=30, history_restart_minutes=30):
         self.counter = counter
@@ -73,11 +22,22 @@ class Context(object):
 
     def __getattr__(self, item):
         if item in ['counter', 'entities', 'history', 'max_depth', 'dialog', 'history_restart_minutes']:
-            return super.__getattribute__(super, item)
-        return Context.Query(self, item, self.entities.get(item))
+            return super().__getattribute__(item)
+        return EntityQuery(self, item, self.entities.get(item, []))
 
-    def __contains__(self, entity):
-        return entity in self.entities
+    def __setattr__(self, key, value):
+        if key in ['counter', 'entities', 'history', 'max_depth', 'dialog', 'history_restart_minutes']:
+            return super().__setattr__(key, value)
+        if not isinstance(value, EntityValue):
+            raise ValueError("Entity must be an instance of EntityValue")
+        self.entities.setdefault(key, []).insert(0, value)
+
+    def __contains__(self, key: Union[str, Iterable]):
+        if isinstance(key, str):
+            return key in self.entities and self.entities[key]
+        elif isinstance(key, Iterable):
+            return reduce(lambda x, y: x and y, map(self.__contains__, key))
+        raise ValueError("Argument must be either entity name (str) or an iterable of entity names")
 
     def to_dict(self):
         return {
@@ -97,7 +57,6 @@ class Context(object):
         if new_entities is None:
             return {}
 
-        current_state = self.get_history_state(0)
         # add all new entities
         for entity_name, entity_values in new_entities.items():
             # allow also direct passing of {'entity' : 'value'}
@@ -111,27 +70,22 @@ class Context(object):
 
             # prepend each value to start of the list with 0 age
             for value in entity_values:
-                self.add_entity_dict(entity_name, value, current_state)
+                self.add_entity_dict(entity_name, value)
         self.debug()
         return new_entities
 
-    def add_entity_dict(self, entity_name, entity_dict, state):
+    def add_entity_dict(self, entity_name, entity_dict):
+
         if 'value' in entity_dict:
-            entity = Entity(
-                name=entity_name,
-                value=entity_dict['value'], raw=entity_dict,
-                counter=self.counter, scope=None, state=state,
-            )
+            entity = EntityValue(self, entity_name, raw=entity_dict)
             self.entities.setdefault(entity_name, []).insert(0, entity)
+
         if 'values' in entity_dict:  # compound entities
             for item in entity_dict['values']:
                 for role, entity in item.items():
-                    entity = Entity(
-                        name=entity_name + "__" + role,
-                        value=entity.get("value"), raw=entity,
-                        counter=self.counter, scope=None, state=state
-                    )
-                    self.entities.setdefault(entity_name + "__" + role, []).insert(0, entity)
+                    canon_name = entity_name + "__" + role
+                    entity = EntityValue(self, canon_name, value=entity)
+                    self.entities.setdefault(canon_name, []).insert(0, entity)
 
     def add_state(self, state_name):
         timestamp = int(time.time())
@@ -157,12 +111,15 @@ class Context(object):
     def get_history_state(self, index):
         return self.history[index] if len(self.history) > abs(index) else None
 
+    def get_state_name(self):
+        return self.get_history_state(0)
+
     def get_all(self, entity, max_age=None, limit=None, ignored_values=tuple()) -> list:
         values = []
         if entity not in self.entities:
             return values
-        for entity_obj in self.entities[entity]: # type: Entity
-            age = entity_obj.get_age(self.counter)
+        for entity_obj in self.entities[entity]:  # type: EntityValue
+            age = self.counter - entity_obj.counter
             # if I found a too old value, stop looking
             if max_age is not None and age > max_age:
                 break
@@ -183,10 +140,10 @@ class Context(object):
             entities = self.get_all_first(entity, max_age=max_age)
             if entities:
                 vs = [entity.value for entity in entities]
-                self.dialog.log.info('{} (age {}): {}'.format(entity, entities[0].get_age(self.counter), vs if len(vs) > 1 else vs[0]))
+                self.dialog.log.info('{} (age {}): {}'.format(entity, self.counter - entities[0].counter, vs if len(vs) > 1 else vs[0]))
         self.dialog.log.info('----------------------------------')
 
-    def get(self, entity, max_age=None, ignored_values=tuple()) -> Entity or None:
+    def get(self, entity, max_age=None, ignored_values=tuple()) -> EntityValue or None:
         values = self.get_all(entity, max_age=max_age, limit=1, ignored_values=ignored_values)
         if not values:
             return None
@@ -202,7 +159,7 @@ class Context(object):
         ents = self.get_all(entity, max_age=max_age, limit=1, ignored_values=ignored_values)
         if not ents:
             return None, None
-        return ents[0], ents[0].get_age(self.counter)
+        return ents[0], (self.counter - ents[0].counter)
 
     def get_all_first(self, entity_name, max_age=None):
         values = []
@@ -210,8 +167,8 @@ class Context(object):
             return values
         found_age = None
         existing = []
-        for entity_obj in self.entities[entity_name]:  # type: Entity
-            age = entity_obj.get_age(self.counter)
+        for entity_obj in self.entities[entity_name]:  # type: EntityValue
+            age = self.counter - entity_obj.counter
             # if I found a too old value, stop looking
             if max_age is not None and age > max_age:
                 break
@@ -225,33 +182,26 @@ class Context(object):
             values.append(entity_obj)
         return values[::-1]
 
-    def set(self, entity, value_dict):
+    def set(self, entity_name, value_dict):
         if not isinstance(value_dict, dict):
             raise ValueError('Use a dict to set a context value, e.g. {"value":"foo"}. Call multiple times to add more.')
-        if entity not in self.entities:
-            self.entities[entity] = []
         value_dict['counter'] = self.counter
-        self.entities[entity] = [value_dict] + self.entities[entity][:self.max_depth-1]
-
-    def set_value(self, entity_name, value):
-        if entity_name not in self.entities:
-            self.entities[entity_name] = []
-        entity_obj = Entity(
-            name=entity_name,
-            value=value,
-            raw={"value": value},
-            counter=self.counter
-        )
-        self.entities[entity_name].insert(0, entity_obj)
+        entity_obj = EntityValue(self, entity_name, raw=value_dict)
+        self.entities.setdefault(entity_name, []).insert(0, entity_obj)
         self.entities[entity_name] = self.entities[entity_name][:self.max_depth - 1]
 
-    def has_any(self, entities, max_age=None):
+    def set_value(self, entity_name, value):
+        entity_obj = EntityValue(self, entity_name, value=value)
+        self.entities.setdefault(entity_name, []).insert(0, entity_obj)
+        self.entities[entity_name] = self.entities[entity_name][:self.max_depth - 1]
+
+    def has_any(self, entities, max_age=None):  # TODO
         for entity in entities:
             if self.get(entity, max_age=max_age):
                 return True
         return False
 
-    def has_all(self, entities, max_age=None):
+    def has_all(self, entities, max_age=None):  # TODO
         for entity in entities:
             if not self.get(entity, max_age=max_age):
                 return False

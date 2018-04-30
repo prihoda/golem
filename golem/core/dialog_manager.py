@@ -20,7 +20,7 @@ from .tests import ConversationTestRecorder
 
 
 class DialogManager:
-    version = '1.32'
+    version = '1.33'
 
     def __init__(self, session: ChatSession):
         self.session = session
@@ -187,11 +187,11 @@ class DialogManager:
             state.action(dialog=self)
 
     def check_state_transition(self):
-        new_state_name = self.context._state.get() #get('_state', max_age=0)
+        new_state_name = self.context._state.current_v()  #get('_state', max_age=0)
         return self.move_to(new_state_name)
 
     def check_intent_transition(self):
-        intent = self.context.intent.get()
+        intent = self.context.intent.current_v()
         if not intent:
             return False
         # FIXME Get custom intent transition
