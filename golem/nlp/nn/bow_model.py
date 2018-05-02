@@ -22,16 +22,15 @@ class BowModel:
             self.load_model()
 
     def init_model(self):
-        # TODO how about hinge and no softmax
         self.model = Sequential()
         self.model.add(L.Dense(512, input_dim=len(self.vocab)))
         self.model.add(L.Activation('relu'))
         self.model.add(L.Dense(512))
         self.model.add(L.Activation('relu'))
         self.model.add(L.Dense(len(self.labels)))
-        self.model.add(L.Activation('softmax'))
+        # self.model.add(L.Activation('softmax'))
         self.model.compile(
-            loss='categorical_crossentropy',
+            loss='categorical_hinge',  # TODO or crossentropy :-P
             optimizer='sgd',
             metrics=['accuracy']
         )
@@ -63,6 +62,7 @@ class BowModel:
     def train(self, data):
         print("Training BOW model ...")
         self.labels = list(set([x['value'] for x in data]))
+        self.labels.insert(0, "none")
         sentences = dict((x['value'], x['samples']) for x in data)
         sentences.setdefault(None, []).append([])
 
@@ -73,10 +73,16 @@ class BowModel:
         x, y = [], []
 
         for value, samples in sentences.items():
-            if value is None: continue
+            if value is None:
+                value = 'none'
             for sample in samples:
                 x.append(self.encode_sentence(sample))
                 y.append(value)
+
+        for _ in range(10):
+            # close your eyes please
+            x.append([0] * len(self.vocab))
+            y.append('none')
 
         x, y = shuffle(x, y)
 

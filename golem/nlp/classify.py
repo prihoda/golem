@@ -92,7 +92,10 @@ def classify_trait_bow(utterance, entity, threshold=0.7):
         bow_models[entity] = BowModel(entity, entity_dir)
     model = bow_models[entity]
 
-    return model.predict(utterance, threshold)
+    value = model.predict(utterance, threshold)
+    if value is not None and value != 'none':
+        return [{'value': value}]
+    return None
 
 
 def classify(text: str, current_state=None):
