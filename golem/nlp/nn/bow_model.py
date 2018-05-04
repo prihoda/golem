@@ -1,4 +1,5 @@
 import pickle
+import re
 
 import numpy as np
 import keras.layers as L
@@ -17,6 +18,7 @@ class BowModel:
             raise ValueError('Base dir and entity name must be set')
         self.base_dir = base_dir
         self.entity = entity
+        self.stopwords = {"i", "you", "do", "?", "!", ".", ","}
 
         if not is_training:
             self.load_model()
@@ -25,12 +27,12 @@ class BowModel:
         self.model = Sequential()
         self.model.add(L.Dense(512, input_dim=len(self.vocab)))
         self.model.add(L.Activation('relu'))
-        self.model.add(L.Dense(512))
+        self.model.add(L.Dense(len(self.labels) * 5))
         self.model.add(L.Activation('relu'))
         self.model.add(L.Dense(len(self.labels)))
-        # self.model.add(L.Activation('softmax'))
+        self.model.add(L.Activation('softmax'))
         self.model.compile(
-            loss='categorical_hinge',  # TODO or crossentropy :-P
+            loss='categorical_crossentropy',  # TODO or crossentropy :-P
             optimizer='sgd',
             metrics=['accuracy']
         )
@@ -41,6 +43,8 @@ class BowModel:
             for sent in list_:
                 tokens = cleanup.tokenize(sent)
                 vocab = vocab.union(tokens)
+        vocab = vocab.difference(self.stopwords)
+        vocab.add("[NUM]")
         return list(vocab)
 
     def load_model(self):
@@ -53,16 +57,23 @@ class BowModel:
         bow = [0.] * len(self.vocab)
         tokens = cleanup.tokenize(sentence)
         for token in tokens:
-            if token in self.vocab:
-                bow[self.vocab.index(token)] += 1.0
+            if re.match("[0-9]+", token):
+              bow[self.vocab.index("[NUM]")] = 1.0
+            elif token in self.vocab:
+                bow[self.vocab.index(token)] = 1.0
             else:
                 print("Not in vocab")
+        print(bow)
         return bow
 
     def train(self, data):
         print("Training BOW model ...")
         self.labels = list(set([x['value'] for x in data]))
-        self.labels.insert(0, "none")
+
+        if "none" not in self.labels:
+            # negative samples (this is a hack)
+            self.labels.insert(0, "none")
+
         sentences = dict((x['value'], x['samples']) for x in data)
         sentences.setdefault(None, []).append([])
 
@@ -93,7 +104,7 @@ class BowModel:
             np.array(x), self.onehot.transform(y),
             epochs=1000, batch_size=32,
             callbacks=[
-                EarlyStopping(monitor='loss', min_delta=0.001, verbose=1),
+                EarlyStopping(monitor='loss', min_delta=0.00001, verbose=1),
             ]
         )
         print("Saving model ...")

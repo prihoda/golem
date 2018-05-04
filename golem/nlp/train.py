@@ -1,5 +1,5 @@
 # TODO https://stackoverflow.com/questions/10572603/specifying-optional-dependencies-in-pypi-python-setup-py
-import json
+import yaml
 import os
 import pickle
 
@@ -184,7 +184,7 @@ def train_all(included=None):
     entities = []
     for f in os.scandir(train_dir):
         name, ext = os.path.splitext(f.name)
-        if f.is_file() and ext == '.json':
+        if f.is_file() and ext in ['.json', '.yaml', '.yml']:
             entities.append((name, f))
 
     for entity, filename in entities:
@@ -192,7 +192,7 @@ def train_all(included=None):
             continue
         print('Training', entity)
         with open(filename) as f:
-            data = json.load(f)
+            data = yaml.load(f)
             entity_dir = os.path.join(utils.data_dir(), 'model', entity)
             if not os.path.exists(entity_dir):
                 os.makedirs(entity_dir)
@@ -206,7 +206,7 @@ def train_all(included=None):
                     # metadata['ngrams'] = data.get('ngrams', 3)
                     metadata['stemming'] = data.get('stemming', False)
                     metadata['language'] = data.get('language', utils.get_default_language())
-                json.dump(metadata, g)
+                yaml.dump(metadata, g)
 
             if strategy == "bow":
                 model = BowModel(entity, entity_dir, is_training=True)
@@ -232,7 +232,7 @@ def train_all(included=None):
                 trie = prepare_keywords(samples, should_stem, language)
 
                 with open(os.path.join(entity_dir, 'trie.json'), 'w') as g:
-                    json.dump(trie, g)
+                    yaml.dump(trie, g)
             elif strategy == 'seq2seq':
                 samples = data['data'].items()
                 x, y = [x for x, y in samples], [y for x, y in samples]

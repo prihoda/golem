@@ -20,6 +20,8 @@ def prepare_keywords(data, should_stem=False, language='en') -> dict:
     for item in data:
         value = item.get('value')
         expressions = item.get('expressions', [])
+        examples = item.get('examples', [])
+        expressions += examples
 
         if not (value or expressions):
             raise ValueError("Keyword doesn't have any expressions")
