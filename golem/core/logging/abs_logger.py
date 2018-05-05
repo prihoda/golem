@@ -12,3 +12,9 @@ class MessageLogger(ABC):
     @abstractmethod
     def log_bot_message(self, dialog, time, state, message):
         pass
+
+    def log_error(self, dialog, state, exception):
+        pass
+
+    def log_user(self, dialog, chat_session):
+        pass

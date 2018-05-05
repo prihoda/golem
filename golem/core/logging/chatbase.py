@@ -1,10 +1,8 @@
 import logging
 
 import requests
-import time
-from django.conf import settings
 
-from golem.core.abs_logger import MessageLogger
+from golem.core.logging.abs_logger import MessageLogger
 
 
 class ChatbaseLogger(MessageLogger):
@@ -25,7 +23,7 @@ class ChatbaseLogger(MessageLogger):
             "api_key": self.api_key,
             "type": "user",
             "user_id": dialog.session.chat_id,
-            "time_stamp": int(accepted_time),
+            "time_stamp": int(accepted_time * 1000),
             "platform": self._interface_to_platform(dialog.session.interface.name),
             "message": str(message),
             "intent": dialog.context.get("intent", max_age=0),
@@ -38,12 +36,12 @@ class ChatbaseLogger(MessageLogger):
             logging.error("Chatbase request with code %d, reason: %s", response.status_code, response.reason)
         return response.ok
 
-    def log_bot_message(self, dialog, accepted_time, state, message, entities):
+    def log_bot_message(self, dialog, accepted_time, state, message):
         payload = {
             "api_key": self.api_key,
             "type": "agent",
             "user_id": dialog.session.chat_id,
-            "time_stamp": int(accepted_time),
+            "time_stamp": int(accepted_time * 1000),
             "platform": self._interface_to_platform(dialog.session.interface.name),
             "message": str(message),
             "intent": dialog.context.get("intent", max_age=0),
