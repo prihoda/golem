@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+from base64 import b64encode, b64decode
 
 import random
 
@@ -50,7 +51,7 @@ class WebGuiInterface:
                     b.url = btn.url
                 elif isinstance(btn, PayloadButton):
                     b.action = "postback"
-                    b.url = btn.payload
+                    b.url = b64encode(str.encode(json.dumps(btn.payload)))
                 # todo parse stuff
                 b.save()
 
@@ -103,7 +104,7 @@ class WebGuiInterface:
         if user_message.get('text'):
             return parse_text_message(user_message.get('text'))
         elif user_message.get("payload"):
-            data = user_message.get("payload")
+            data = json.loads(b64decode(user_message["payload"]).decode())
             logging.info("Payload is: {}".format(data))
             if isinstance(data, dict):
                 return {'entities': data, 'type': 'postback'}

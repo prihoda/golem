@@ -1,10 +1,11 @@
-import json
+import yaml
 import pickle
 import os
 
 from django.conf import settings
 
 from golem.nlp.keywords import keyword_search
+from golem.nlp.nn.bow_model import BowModel
 from golem.nlp.nn.seq2seq import Seq2Seq
 
 print('Will import GloVe and TF!')
@@ -23,6 +24,7 @@ glove = utils.get_glove()
 logging.debug('GloVe and TF imported')
 
 models = {}
+bow_models = {}
 imputers = {}
 
 NLP_DATA_DIR = utils.data_dir()
@@ -83,6 +85,19 @@ def classify_trait(text, entity, threshold):
     return None
 
 
+def classify_trait_bow(utterance, entity, threshold=0.9):
+    entity_dir = os.path.join(NLP_DATA_DIR, 'model', entity)
+
+    if entity not in bow_models:
+        bow_models[entity] = BowModel(entity, entity_dir)
+    model = bow_models[entity]
+
+    value = model.predict(utterance, threshold)
+    if value is not None and value != 'none':
+        return [{'value': value}]
+    return None
+
+
 def classify(text: str, current_state=None):
     """
     Classifies all entity values of a text input.
@@ -107,21 +122,24 @@ def classify(text: str, current_state=None):
         entity_dir = os.path.join(model_dir, entity)
 
         with open(os.path.join(entity_dir, 'metadata.json'), 'r') as f:
-            metadata = json.load(f)
+            metadata = yaml.load(f)
 
         # if the entity is limited by allowed states, check if we're in one of them before continuing
         if current_state and 'allowed_states' in metadata:
             if current_state not in metadata['allowed_states']:
                 continue
 
-        if metadata['strategy'] == 'trait':
+        if metadata['strategy'] == 'bow':
+            pred = classify_trait_bow(text, entity, metadata.get('threshold', 0.9))
+            if pred: output[entity] = pred
+        elif metadata['strategy'] == 'trait':
             pred = classify_trait(text, entity, metadata.get('threshold', 0.7))
             if pred:
                 output[entity] = pred
         elif metadata['strategy'] == 'keywords':
             import unidecode
             with open(os.path.join(entity_dir, "trie.json"), 'r') as g:
-                trie = json.load(g)
+                trie = yaml.load(g)
             should_stem = metadata.get('stemming', False)
             language = metadata.get('language', utils.get_default_language())
             pred = keyword_search(unidecode.unidecode(text), trie, should_stem, language)
@@ -148,11 +166,11 @@ def test_all():
     entities = []
     for f in os.scandir(test_dir):
         name, ext = os.path.splitext(f.name)
-        if f.is_file() and ext == '.json':
+        if f.is_file() and ext in ['.json', '.yaml', '.yml']:
             entities.append((name, f))
     for entity, filename in entities:
         with open(filename) as f:
-            examples = json.load(f).items()
+            examples = yaml.load(f).items()
             model_dir = os.path.join(NLP_DATA_DIR, 'model', entity)
             model = get_model(entity, model_dir)
             pickle_data = pickle.load(open(os.path.join(model_dir, 'pickle.json'), 'rb'))

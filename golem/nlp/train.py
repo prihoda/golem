@@ -1,5 +1,5 @@
 # TODO https://stackoverflow.com/questions/10572603/specifying-optional-dependencies-in-pypi-python-setup-py
-import json
+import yaml
 import os
 import pickle
 
@@ -9,6 +9,7 @@ import random
 from golem.nlp import cleanup
 from golem.nlp import utils
 from golem.nlp.keywords import prepare_keywords
+from golem.nlp.nn.bow_model import BowModel
 from golem.nlp.nn.model import Model
 from golem.nlp.nn.seq2seq import Seq2Seq
 
@@ -52,7 +53,7 @@ def process(entities, imputation_rules):
 
 
 class Batcher:
-    def __init__(self, training, max_words=10):
+    def __init__(self, training, max_words=10, use_vocab=False):
         self.glove = utils.get_glove()
         self.dim = self.glove.get_dimension()
         self.max_words = max_words
@@ -66,10 +67,20 @@ class Batcher:
         self.unk = self.glove.get_vector("<unk>")
         if self.unk is None: self.unk = np.zeros([self.dim])
         self.oov = set()
+
+        if use_vocab:
+            self.vocab = self.make_vocab(self.sentences.values())
+
+            self.sentences_bow = dict(  # converts sentences to bag of words features
+                (k, list(filter(None, [self.encode_sentence_bow(sent) for sent in v])))
+                for k, v in self.sentences.items()
+            )
+
         self.sentences = dict(  # converts sentences to embedded feature vectors
             (k, list(filter(None, [self.process_sentence(sent) for sent in v])))
             for k, v in self.sentences.items()
         )
+
         # TODO somehow distinguish PAD, END, START, UNK and NIL
 
         if len(self.oov) > 0:
@@ -96,6 +107,21 @@ class Batcher:
             print("### [Warning] Sentence \"{}\" has no valid words! Removing! ###".format(sentence))
         return (features, random_positions) if has_valid_token else None
 
+    def make_vocab(self, sentences):
+        vocab = set()
+        for sent in sentences:
+            tokens = cleanup.imputer(cleanup.tokenize(sent), self.imputation_rules)
+            vocab += tokens
+        return list(vocab)
+
+    def encode_sentence_bow(self, sentence):
+        bow = [0.] * len(self.vocab)
+        tokens = cleanup.imputer(cleanup.tokenize(sentence), self.imputation_rules)
+        for token in tokens:
+            if token in self.vocab:
+                bow[self.vocab.index(token)] = 1.0
+        return bow
+
     def next_batch(self, batch_size):
         # ensure proper stratification
         labels = [random.choice(self.labels) for _ in range(batch_size)]
@@ -104,6 +130,18 @@ class Batcher:
             sentence, positions = random.choice(self.sentences[label])
             for pos in positions:
                 sentence[pos] = np.random.random([self.dim])
+            x.append(sentence)
+            one_hot = [0.] * len(self.labels)
+            if label not in [None, 'none', 'None']:
+                one_hot[self.labels.index(label)] = 1.0
+            y.append(one_hot)
+        return x, y
+
+    def next_batch_bow(self, batch_size):
+        labels = [random.choice(self.labels) for _ in range(batch_size)]
+        x, y = [], []
+        for i, label in enumerate(labels):
+            sentence = random.choice(self.sentences_bow[label])
             x.append(sentence)
             one_hot = [0.] * len(self.labels)
             if label not in [None, 'none', 'None']:
@@ -133,6 +171,10 @@ def trashify(x):
     return x
 
 
+def train_fuzzy_matcher(examples):
+    pass
+
+
 def train_all(included=None):
     """
     Trains all entity values from their JSON descriptions.
@@ -142,7 +184,7 @@ def train_all(included=None):
     entities = []
     for f in os.scandir(train_dir):
         name, ext = os.path.splitext(f.name)
-        if f.is_file() and ext == '.json':
+        if f.is_file() and ext in ['.json', '.yaml', '.yml']:
             entities.append((name, f))
 
     for entity, filename in entities:
@@ -150,7 +192,7 @@ def train_all(included=None):
             continue
         print('Training', entity)
         with open(filename) as f:
-            data = json.load(f)
+            data = yaml.load(f)
             entity_dir = os.path.join(utils.data_dir(), 'model', entity)
             if not os.path.exists(entity_dir):
                 os.makedirs(entity_dir)
@@ -164,9 +206,12 @@ def train_all(included=None):
                     # metadata['ngrams'] = data.get('ngrams', 3)
                     metadata['stemming'] = data.get('stemming', False)
                     metadata['language'] = data.get('language', utils.get_default_language())
-                json.dump(metadata, g)
+                yaml.dump(metadata, g)
 
-            if strategy == 'trait':
+            if strategy == "bow":
+                model = BowModel(entity, entity_dir, is_training=True)
+                model.train(data['data'])
+            elif strategy == 'trait':
                 # train as neural network
                 # samples = data['data']
                 # imputation = data.get('imputation', [])
@@ -187,13 +232,16 @@ def train_all(included=None):
                 trie = prepare_keywords(samples, should_stem, language)
 
                 with open(os.path.join(entity_dir, 'trie.json'), 'w') as g:
-                    json.dump(trie, g)
+                    yaml.dump(trie, g)
             elif strategy == 'seq2seq':
                 samples = data['data'].items()
                 x, y = [x for x, y in samples], [y for x, y in samples]
                 model = Seq2Seq(entity, entity_dir)
                 model.train(x, y)
                 model.destroy()
+            elif strategy == 'fuzzy':
+                samples = data['data']
+                train_fuzzy_matcher(samples)
             else:
                 print("Unknown training strategy {} for entity {}, skipping!".format(strategy, entity))
 

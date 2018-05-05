@@ -2,8 +2,6 @@ import json
 import logging
 import pickle
 
-from celery.utils.log import get_task_logger
-from django.conf import settings
 from wit import Wit
 
 from golem.core.parsing import date_utils
@@ -13,15 +11,15 @@ from golem.core.persistence import get_redis
 
 class WitExtractor(EntityExtractor):
 
-    def __init__(self):
+    def __init__(self, wit_token, enable_cache=True):
         super().__init__()
         self.log = logging.getLogger()
-        self.wit_token = settings.GOLEM_CONFIG.get('WIT_TOKEN')
+        self.wit_token = wit_token
         if not self.wit_token:
             raise ValueError("Wit token not found!")
         self.cache_key = 'wit_cache'
-        self.cache = settings.GOLEM_CONFIG.get('WIT_CACHE')
-        self.clear_wit_cache()
+        self.cache = enable_cache
+        # self.clear_wit_cache()
 
     def extract_entities(self, text: str, max_retries=5):
         if max_retries <= 0:

@@ -10,7 +10,7 @@ def add_default_extractors():
     if "WIT_TOKEN" in settings.GOLEM_CONFIG:
         print("Adding wit extractor from wit token")
         from golem.core.parsing import wit_extractor
-        ENTITY_EXTRACTORS.append(wit_extractor.WitExtractor())
+        ENTITY_EXTRACTORS.append(wit_extractor.WitExtractor(settings.GOLEM_CONFIG['WIT_TOKEN']))
 
 
 add_default_extractors()
