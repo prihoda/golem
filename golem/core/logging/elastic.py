@@ -1,6 +1,7 @@
+import json
 import time
 
-from golem.core.chat_session import Profile, ChatSession
+from golem.core.chat_session import ChatSession
 from golem.core.logging.abs_logger import MessageLogger
 from golem.core.persistence import get_elastic
 
@@ -21,7 +22,7 @@ class ElasticsearchLogger(MessageLogger):
 
         message = {
             'uid': dialog.session.chat_id,
-            'test_id': -1,  # TODO
+            'test_id': self.test_id,
             'created': time,
             'is_user': True,
             'text': text,
@@ -33,6 +34,10 @@ class ElasticsearchLogger(MessageLogger):
 
     def log_bot_message(self, dialog, time, state, message):
 
+        type_ = type(message).__name__ if message else 'TextMessage'
+        response = json.loads(
+            json.dumps(message, default=lambda obj: obj.__dict__ if hasattr(obj, '__dict__') else str(obj)))
+
         message = {
             'uid': dialog.session.chat_id,
             'test_id': self.test_id,
@@ -40,9 +45,8 @@ class ElasticsearchLogger(MessageLogger):
             'is_user': False,
             'text': message,
             'state': state,
-            'type': None,  # TODO 'type(response).__name__ if response else 'TextMessage',
-            'response': None,
-        # TODO json.loads(json.dumps(response, default=lambda obj: obj.__dict__ if hasattr(obj,'__dict__') else str(obj)))
+            'type': type_,
+            'response': response,
         }
         self._log_message(message)
 

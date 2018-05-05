@@ -6,7 +6,7 @@ class MessageLogger(ABC):
         pass
 
     @abstractmethod
-    def log_user_message(self, dialog, time, state, message, type, entities):
+    def log_user_message(self, dialog, time, state, message, type_, entities):
         pass
 
     @abstractmethod
