@@ -16,7 +16,8 @@
         {% for m in messages %}
             <div class="message_container" style="float: {% if m.is_response %} left {% else %} right {% endif %};">
                 {% if m.is_response %}
-                <img class="circle-image" src="{% static bot_img %}"/> {% endif %}
+                <img class="circle-image" src="{% static bot_img %}"
+                     onerror='this.onerror=null; this.src="https://placehold.it/100x100"'/> {% endif %}
                 <div class="msg" style="text-align: {% if m.is_response %} left {% else %} right {% endif %}">
                     <div class="bubble"><span class="text">{{ m.text }}</span></div>
 
@@ -50,13 +51,14 @@
                 <span class="time"
                       style="float: {% if m.is_response %} right {% else %} left {% endif %};">[{{ m.get_time }}]</span>
                 {% if not m.is_response %}
-                    <img class="circle-image" src="{% static user_img %}"/> {% endif %}
+                <img class="circle-image" src="{% static user_img %}"
+                     onerror='this.onerror=null; this.src="https://placehold.it/100x100"'/> {% endif %}
         </div>
         {% endfor %}
     </div>
 </div>
 <div id="footer">
-    <form id="form_msg">
+    <form id="form_msg" autocomplete="off">
     {% csrf_token %}
     {{ form }}
     <input type="submit" value="Send">
@@ -350,6 +352,7 @@
         border-radius: 2px;
         padding: 12px;
         box-shadow: 0 5px 10px #aaaaaa;
+        outline: 0;
     }
 
     input[type='submit']:focus, input[type='submit']:hover {
