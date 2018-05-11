@@ -1,9 +1,9 @@
 import pickle
-import re
 
-import numpy as np
 import keras.layers as L
+import numpy as np
 import os
+import re
 from keras.callbacks import EarlyStopping
 from keras.models import Sequential, load_model
 from sklearn.preprocessing import LabelBinarizer
@@ -63,7 +63,7 @@ class BowModel:
                 bow[self.vocab.index(token)] = 1.0
             else:
                 print("Not in vocab")
-        print(bow)
+        # print(bow)
         return bow
 
     def train(self, data):

@@ -1,11 +1,12 @@
-import yaml
 import pickle
-import os
 
+import os
+import yaml
 from django.conf import settings
 
 from golem.nlp.keywords import keyword_search
 from golem.nlp.nn.bow_model import BowModel
+from golem.nlp.nn.contextual import ContextualModel
 from golem.nlp.nn.seq2seq import Seq2Seq
 
 print('Will import GloVe and TF!')
@@ -25,6 +26,7 @@ logging.debug('GloVe and TF imported')
 
 models = {}
 bow_models = {}
+ctx_models = {}
 imputers = {}
 
 NLP_DATA_DIR = utils.data_dir()
@@ -98,6 +100,16 @@ def classify_trait_bow(utterance, entity, threshold=0.9):
     return None
 
 
+def classify_kewords_contextual(utterance, entity):
+    entity_dir = os.path.join(NLP_DATA_DIR, 'model', entity)
+
+    if entity not in ctx_models:
+        ctx_models[entity] = ContextualModel(entity, entity_dir)
+    model = ctx_models[entity]
+
+    return model.predict(utterance)
+
+
 def classify(text: str, current_state=None):
     """
     Classifies all entity values of a text input.
@@ -132,6 +144,8 @@ def classify(text: str, current_state=None):
         if metadata['strategy'] == 'bow':
             pred = classify_trait_bow(text, entity, metadata.get('threshold', 0.9))
             if pred: output[entity] = pred
+        elif metadata['strategy'] == 'context':
+            output[entity] = classify_kewords_contextual(text, entity)
         elif metadata['strategy'] == 'trait':
             pred = classify_trait(text, entity, metadata.get('threshold', 0.7))
             if pred:

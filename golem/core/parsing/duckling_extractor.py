@@ -40,7 +40,7 @@ class DucklingExtractor(EntityExtractor):
                 return self.extract_entities(text, max_retries - 1)
             else:
                 logging.exception('Exception @ Duckling')
-        return []
+        return {}
 
     def to_entities(self, jsn):
         """Converts duckling output to the correct format."""

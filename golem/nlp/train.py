@@ -1,15 +1,16 @@
 # TODO https://stackoverflow.com/questions/10572603/specifying-optional-dependencies-in-pypi-python-setup-py
-import yaml
-import os
 import pickle
 
 import numpy as np
+import os
 import random
+import yaml
 
 from golem.nlp import cleanup
 from golem.nlp import utils
 from golem.nlp.keywords import prepare_keywords
 from golem.nlp.nn.bow_model import BowModel
+from golem.nlp.nn.contextual import ContextualModel
 from golem.nlp.nn.model import Model
 from golem.nlp.nn.seq2seq import Seq2Seq
 
@@ -210,6 +211,9 @@ def train_all(included=None):
 
             if strategy == "bow":
                 model = BowModel(entity, entity_dir, is_training=True)
+                model.train(data['data'])
+            elif strategy == 'context':
+                model = ContextualModel(entity, entity_dir, is_training=True)
                 model.train(data['data'])
             elif strategy == 'trait':
                 # train as neural network

@@ -70,11 +70,11 @@ class GActionsView(generic.View):
         return generic.View.dispatch(self, request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
-        from golem.core.interfaces.gactions import GActionsInterface
+        from golem.core.interfaces.google import GoogleActionsInterface
         body = json.loads(self.request.body.decode('utf-8'))
-        logging.critical(body)
-        GActionsInterface.accept_request(body)
-        return HttpResponse()
+        logging.info(body)
+        resp = GoogleActionsInterface.accept_request(body)
+        return JsonResponse(resp)
 
 
 class SkypeView(generic.View):
