@@ -7,6 +7,7 @@ import re
 from django.conf import settings
 
 from golem.core.chat_session import ChatSession
+from golem.core.responses import LinkButton
 from golem.core.responses.responses import TextMessage
 from golem.tasks import accept_inactivity_callback, accept_schedule_callback
 from .context import Context
@@ -324,3 +325,23 @@ class DialogManager:
             # text = response.text if hasattr(response, 'text') else (response if isinstance(response, str) else None)
             # if text and self.should_log_messages:
             #     message_logger.on_message.delay(self.session, text, self, from_user=False)
+
+    def dont_understand(self):
+        # TODO log to chatbase
+        # TODO work in progress
+        from golem.core.parsing import golem_extractor
+        utterance = self.context.get("_message_text", max_age=0)
+        nlu = golem_extractor.GOLEM_NLU
+        if not nlu or not utterance:
+            print("NLU instance and message text can't be None")
+            return
+        intent = nlu.parse_entity(utterance, 'intent', threshold=0.5)
+        if intent:
+            text = "I'm not sure what you mean. Are you talking about \"{}\"?".format(intent[0]['value'])
+            message = TextMessage(text).with_replies(['Yes', 'No'])
+            self.send_response(message)
+        else:
+            text = "I'm not sure what you mean. Could you help me learn?"
+            message = TextMessage(text).add_button(LinkButton("WebView", "http://zilinec.me/intent.html"))
+            self.send_response(message)
+            # TODO webview

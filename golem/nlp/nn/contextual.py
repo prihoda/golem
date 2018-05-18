@@ -9,9 +9,10 @@ from sklearn.preprocessing import LabelBinarizer
 from sklearn.utils import shuffle
 
 from golem.nlp import cleanup
+from golem.nlp.nn.abs_model import NLUModel
 
 
-class ContextualModel:
+class ContextualModel(NLUModel):
     def __init__(self, entity, base_dir, is_training=False):
         if not base_dir or not entity:
             raise ValueError('Base dir and entity name must be set')
@@ -122,7 +123,7 @@ class ContextualModel:
     def test(self):
         pass  # TODO
 
-    def predict(self, utterance):
+    def predict(self, utterance, threshold=None):
         tokens = cleanup.tokenize(utterance)
         results = []
         current_entity = []

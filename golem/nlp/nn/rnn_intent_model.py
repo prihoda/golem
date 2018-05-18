@@ -1,16 +1,21 @@
 import json
+import logging
+import pickle
 from datetime import datetime
 
-import os
-
-import random
-import tensorflow as tf
 import numpy as np
+import os
+import tensorflow as tf
 from django.conf import settings
 
+from golem.nlp import utils, cleanup
+from golem.nlp.nn.abs_model import NLUModel
 
-class Model:
-    def __init__(self, entity, base_dir):
+MAX_WORD_COUNT = settings.NLP_CONFIG.get("MAX_WORD_COUNT", 10)
+
+
+class RecurrentIntentModel(NLUModel):
+    def __init__(self, entity, base_dir, is_training=False):
         if not base_dir or not entity:
             raise ValueError('Base dir and entity name must be set')
         self.base_dir = base_dir
@@ -20,6 +25,12 @@ class Model:
         self.file_writer = tf.summary.FileWriter(os.path.join(base_dir, entity, "tensorboard", str(datetime.now())))
         self.loaded = False
         self.label_cnt = None
+
+        if not is_training:
+            self.glove = utils.get_glove()
+            with open(os.path.join(base_dir, 'metadata.pkl'), 'rb') as f:
+                self.metadata = pickle.load(f)
+                self.labels = self.metadata['labels']
 
     def destroy(self):
         self.session.close()
@@ -178,7 +189,47 @@ class Model:
         saver = tf.train.Saver()
         saver.restore(self.session, os.path.join(self.base_dir, self.entity, 'tf_session'))
 
-    def predict(self, features):
+    def predict(self, utterance: str, threshold=None):
+
+        if threshold is None:
+            threshold = 0.7  # TODO
+
+        vector = self.word2vec(utterance)
+        y_pred = self.get_predictions(vector)[0]
+        logging.debug(y_pred)
+        print(y_pred)
+        y_pred = [[i, score] for i, score in enumerate(y_pred) if score > threshold]
+        y_pred.sort(key=lambda x: x[1], reverse=True)
+
+        if len(y_pred) > 0:
+            value = self.labels[y_pred[0][0]]
+            prob = y_pred[0][1]
+            print('> Predicted {}: {} Prob: {}%'.format(self.entity, value, prob * 100))
+            print('All scores > threshold are:', y_pred)
+            if value is not None and value != 'none':
+                return [{'value': value, 'confidence': float(prob)}]
+        return None
+
+    def word2vec(self, text):
+        """
+        Converts text to a vector.
+        :param text     Text to be vectorized.
+        :returns        A numpy array.
+        """
+        features = [np.zeros(self.glove.get_dimension()) for x in range(10)]
+        tokens = cleanup.tokenize(text, stemming=False, language="cz")  # FIXME stemming, language
+        imputer_rules = utils.get_imputation_rules(self.entity)  # TODO
+        clean_text = cleanup.imputer(tokens, imputer_rules)
+        print("Tokens:", clean_text)
+        for idx, word in enumerate(clean_text):
+            if idx > MAX_WORD_COUNT:
+                logging.warning('Message too long!')  # FIXME allow longer messages
+            vec = self.glove.get_vector(word)
+            if vec is not None:
+                features[idx] = vec
+        return np.array([features])
+
+    def get_predictions(self, features):
         with self.graph.as_default():
             if not self.loaded:
                 self.load()

@@ -10,9 +10,10 @@ from sklearn.preprocessing import LabelBinarizer
 from sklearn.utils import shuffle
 
 from golem.nlp import cleanup
+from golem.nlp.nn.abs_model import NLUModel
 
 
-class BowModel:
+class BowModel(NLUModel):
     def __init__(self, entity, base_dir, is_training=False):
         if not base_dir or not entity:
             raise ValueError('Base dir and entity name must be set')
@@ -113,7 +114,27 @@ class BowModel:
             pickle.dump((self.vocab, self.labels, self.onehot), f)
         print("Done.")
 
-    def predict(self, utterance, threshold=0.7):
+    def predict(self, utterance, threshold=None):
+        if threshold is None:
+            threshold = 0.9
+        label, confidence = self.get_prediction(utterance, threshold)
+        if label is not None and label != 'none':
+            return [{'value': label, 'confidence': confidence, 'source': 'golem'}]
+        return None
+
+    def get_prediction(self, utterance, threshold=0.9):
         x = self.encode_sentence(utterance)
-        pred = self.model.predict(np.array([x]), batch_size=1)
-        return self.onehot.inverse_transform(pred, threshold=threshold)[0]
+        probs = self.model.predict_proba(np.array([x]), batch_size=1)[0]
+        # TODO maybe confidence can be something different
+
+        if probs.max() >= threshold:
+            confidence = probs.max()
+            label = self.onehot.classes_[probs.argmax()]
+            return label, float(confidence)
+
+        return None, None
+
+    def get_probabilities(self, utterance):
+        x = self.encode_sentence(utterance)
+        probs = self.model.predict_proba(np.array([x]), batch_size=1)[0]
+        return [(self.onehot.classes_[idx], val) for idx, val in enumerate(probs)]

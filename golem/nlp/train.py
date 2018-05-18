@@ -8,11 +8,10 @@ import yaml
 
 from golem.nlp import cleanup
 from golem.nlp import utils
-from golem.nlp.keywords import prepare_keywords
+from golem.nlp.keywords import TrieKeywordModel
 from golem.nlp.nn.bow_model import BowModel
 from golem.nlp.nn.contextual import ContextualModel
-from golem.nlp.nn.model import Model
-from golem.nlp.nn.seq2seq import Seq2Seq
+from golem.nlp.nn.rnn_intent_model import RecurrentIntentModel
 
 
 def process(entities, imputation_rules):
@@ -156,7 +155,7 @@ def train_entity(batcher, entity_name, entity_dir, num_iterations):
     Trains a model for recognizing entity based on x, y.
     """
     print("[Training entity {} for {} iterations]".format(entity_name, num_iterations))
-    model = Model(entity_name, entity_dir)
+    model = RecurrentIntentModel(entity_name, entity_dir)
     model.train(batcher, batcher.iterations, batcher.keep_prob)
     model.destroy()
 
@@ -225,7 +224,7 @@ def train_all(included=None):
                 entity_dir = os.path.join(utils.data_dir(), 'model', entity)
                 batcher = Batcher(data, max_words=10)
                 train_entity(batcher, entity, entity_dir, num_iterations)
-                pickle_path = os.path.join(utils.data_dir(), 'model', entity, 'pickle.json')
+                pickle_path = os.path.join(utils.data_dir(), 'model', entity, 'metadata.pkl')
                 pickle.dump({'labels': batcher.labels},
                             open(pickle_path, 'wb'))
             elif strategy == 'keywords':
@@ -233,16 +232,12 @@ def train_all(included=None):
                 samples = data['data']
                 should_stem = data.get('stemming', False)
                 language = data.get('language', utils.get_default_language())
-                trie = prepare_keywords(samples, should_stem, language)
 
-                with open(os.path.join(entity_dir, 'trie.json'), 'w') as g:
-                    yaml.dump(trie, g)
-            elif strategy == 'seq2seq':
-                samples = data['data'].items()
-                x, y = [x for x, y in samples], [y for x, y in samples]
-                model = Seq2Seq(entity, entity_dir)
-                model.train(x, y)
-                model.destroy()
+                TrieKeywordModel(entity, entity_dir, is_training=True).prepare(
+                    examples=samples,
+                    metadata={"stemming": should_stem, "language": language}
+                )
+
             elif strategy == 'fuzzy':
                 samples = data['data']
                 train_fuzzy_matcher(samples)

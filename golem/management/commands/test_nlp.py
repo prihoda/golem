@@ -1,12 +1,13 @@
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
-    help = 'Tests the NLP on a sentence'
+    help = 'Runs NLP tests'
 
-    # def add_arguments(self, parser):
-    #     parser.add_argument('text', nargs=1, type=str)
+    def add_arguments(self, parser):
+        parser.add_argument('text', nargs='+', type=str)
 
     def handle(self, *args, **options):
-        from golem.nlp import classify
-        classify.test_all()
+        # from golem.nlp import train
+        # train.test_all()
+        raise NotImplementedError("TO DO")
