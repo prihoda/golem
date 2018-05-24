@@ -250,15 +250,15 @@ class Requirement():
         if not self.action:
             raise ValueError("Requirement has no message nor action")
 
-        def matches(self, context) -> bool:
-            if self.entity not in context:
-                return False
-            if self.filter is not None:
-                from golem.core.entity_query import EntityQuery
-                # TODO move to new class PreparedFilter
-                eq = EntityQuery.from_yaml(context, self.entity, self.filter)
-                return eq != 0
-            return True
+    def matches(self, context) -> bool:
+        if self.entity not in context:
+            return False
+        if self.filter is not None:
+            from golem.core.entity_query import EntityQuery
+            # TODO move to new class PreparedFilter
+            eq = EntityQuery.from_yaml(context, self.entity, self.filter)
+            return eq.count() > 0
+        return True
 
 
 def load_flows_from_definitions(data: dict):

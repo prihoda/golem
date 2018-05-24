@@ -30,6 +30,7 @@ class EntityQuery:
             self.items = filter(lambda x: x.timestamp > time_min, self.items)
         elif abs_time:
             self.items = filter(lambda x: x.timestamp > abs_time, self.items)
+        self.items = list(self.items)
         return self
 
     def older_than(self, messages=None, delta=None, abs_time=None):
@@ -50,6 +51,7 @@ class EntityQuery:
             self.items = filter(lambda x: x.timestamp < time_max, self.items)
         elif abs_time:
             self.items = filter(lambda x: x.timestamp < abs_time, self.items)
+        self.items = list(self.items)
         return self
 
     def exactly(self, messages=None, delta=None, abs_time=None):
@@ -70,16 +72,17 @@ class EntityQuery:
             self.items = filter(lambda x: abs(x.timestamp - time_max) < 1.0, self.items)
         elif abs_time:
             self.items = filter(lambda x: abs(x.timestamp - abs_time) < 1.0, self.items)
+        self.items = list(self.items)
         return self
 
     def include_flow(self, regex: str):
         """Include just entities that were set in a state that matches the regex."""
-        self.items = filter(lambda x: re.match(regex, x.state_set), self.items)
+        self.items = list(filter(lambda x: re.match(regex, x.state_set), self.items))
         return self
 
     def exclude_flow(self, regex: str):
         """Exclude all entities that were set in a state that matches the regex."""
-        self.items = filter(lambda x: re.match(regex, x.state_set) is None, self.items)
+        self.items = list(filter(lambda x: re.match(regex, x.state_set) is None, self.items))
         return self
 
     def set_with(self, entity: str, value):
@@ -93,6 +96,7 @@ class EntityQuery:
                     filtered.append(item)
                     break
         self.items = filtered
+        return self
 
     def not_set_with(self, entity: str, value):
         # FIXME make lookups by age effective
@@ -108,6 +112,7 @@ class EntityQuery:
             if not has_match:
                 filtered.append(entity)
         self.items = filtered
+        return self
 
     def latest(self):
         self.items = sorted(self.items, key=lambda x: x.timestamp, reverse=True)
@@ -146,35 +151,52 @@ class EntityQuery:
             raise ValueError("Refusing to do OR operation, other query's context is not the same")
 
         new_name = '|'.join([self.name, other.name])
-        return EntityQuery(self.context, new_name, deepcopy(self.items))
+        new_items = set(self.items).union(other.items)
+        return EntityQuery(self.context, new_name, new_items)
+
+    def __and__(self, other):
+        if not isinstance(other, EntityQuery):
+            raise ValueError("AND operator argument must be an EntityQuery")
+        elif self.context != other.context:
+            raise ValueError("Refusing to do OR operation, other query's context is not the same")
+
+        new_items = set(self.items).intersection(set(other.items))
+        return EntityQuery(self.context, self.name, new_items)
+
 
     @staticmethod
     def from_yaml(context, name: str, yml: list):
         # TODO catch and log errors
         eq = EntityQuery(context, name, context.entities.get(name, []))
         for item in yml:
-            if item == 'or':
-                for arg in yml[item]:
+            key, values = list(item.items())[0]
+            if key == 'or':
+                or_eq = None
+                for arg in values:
                     if not isinstance(arg, list):
                         arg = [arg]
-                    eq = eq or EntityQuery.from_yaml(context, name, arg)
-            elif item == 'set-with':
-                entity, value = yml[item].split(', ')
+                    if or_eq:
+                        or_eq = or_eq.__or__(EntityQuery.from_yaml(context, name, arg))
+                    else:
+                        or_eq = EntityQuery.from_yaml(context, name, arg)
+                eq = eq and or_eq
+            elif key == 'set-with':
+                entity, value = values.split(', ', maxsplit=1)
                 eq.set_with(entity, value)
-            elif item == 'not-set-with':
-                entity, value = yml[item].split(', ', maxsplit=1)
+            elif key == 'not-set-with':
+                entity, value = values.split(', ', maxsplit=1)
                 eq.not_set_with(entity, value)
-            elif item == 'include-flow':
-                flow = yml[item]
+            elif key == 'include-flow':
+                flow = values
                 eq.include_flow(flow)
-            elif item == 'exclude-flow':
-                flow = yml[item]
+            elif key == 'exclude-flow':
+                flow = values
                 eq.exclude_flow(flow)
-            elif item == 'newer':
+            elif key == 'newer':
                 raise NotImplementedError("TO DO")
-            elif item == 'older':
+            elif key == 'older':
                 raise NotImplementedError("TO DO")
-            elif item == 'exactly':
+            elif key == 'exactly':
                 raise NotImplementedError("TO DO")
         return eq
 

@@ -109,10 +109,13 @@ class Context(object):
         return min(ages) if ages else None
 
     def get_history_state(self, index):
-        return self.history[index] if len(self.history) > abs(index) else None
+        if index < 0:
+            index = len(self.history) - index
+        return self.history[index] if len(self.history) > index >= 0 else None
 
     def get_state_name(self):
-        return self.get_history_state(0)
+        return self.dialog.current_state_name
+        # return self.history[-1] if len(self.history) > 0 else None
 
     def get_all(self, entity, max_age=None, limit=None, ignored_values=tuple()) -> list:
         values = []
