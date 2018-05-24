@@ -40,5 +40,5 @@ setup(
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
     ],
     install_requires=['django', 'networkx','requests','six','sqlparse','wit','wheel','redis',
-    'pytz','unidecode','emoji','elasticsearch','celery','dateutil'],
+    'pytz','unidecode','emoji','elasticsearch','celery','dateutil', 'pyyaml'],
 )

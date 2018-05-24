@@ -3,6 +3,7 @@ import logging
 import time
 
 import importlib
+import os
 import re
 from django.conf import settings
 
@@ -11,7 +12,7 @@ from golem.core.responses import LinkButton
 from golem.core.responses.responses import TextMessage
 from golem.tasks import accept_inactivity_callback, accept_schedule_callback
 from .context import Context
-from .flow import Flow
+from .flow import Flow, load_flows_from_definitions
 from .logger import MessageLogging
 from .persistence import get_redis
 from .serialize import json_deserialize, json_serialize
@@ -19,66 +20,69 @@ from .tests import ConversationTestRecorder
 
 
 class DialogManager:
-    version = '1.30'
+    version = '1.33'
 
     def __init__(self, session: ChatSession):
         self.session = session
         self.uid = session.chat_id  # for backwards compatibility
-        # self.logger = ElasticsearchLogger(session)
         self.logger = MessageLogging(self)
         self.db = get_redis()
         self.log = logging.getLogger()
+        self.context = None  # type: Context
 
         self.should_log_messages = settings.GOLEM_CONFIG.get('SHOULD_LOG_MESSAGES', False)
         self.error_message_text = settings.GOLEM_CONFIG.get('ERROR_MESSAGE_TEXT')
 
-        entities = {}
+        context_dict = {}
         version = self.db.get('dialog_version')
         self.log.info('Initializing dialog for chat %s...' % session.chat_id)
         self.current_state_name = None
-        self.context = None  # type: Context
-        if version and \
-                version.decode('utf-8') == DialogManager.version and \
-                self.db.hexists('session_entities', self.session.chat_id):
-            entities_string = self.db.hget('session_entities', self.session.chat_id)
-            history_string = self.db.hget('session_history', self.session.chat_id)
-            self.init_flows()
+
+        if version and version.decode('utf-8') == DialogManager.version and \
+                self.db.hexists('session_context', self.session.chat_id):
+
             state = self.db.hget('session_state', self.session.chat_id).decode('utf-8')
-            counter = int(self.db.hget('session_counter', self.session.chat_id))
-            self.log.info('Session exists at state %s' % (state))
+            self.log.info('Session exists at state %s' % state)
             self.move_to(state, initializing=True)
             # self.log.info(entities_string)
-            entities = json.loads(entities_string.decode('utf-8'), object_hook=json_deserialize)
-            history = json.loads(history_string.decode('utf-8'), object_hook=json_deserialize)
+            context_string = self.db.hget('session_context', self.session.chat_id)
+            context_dict = json.loads(context_string.decode('utf-8'), object_hook=json_deserialize)
         else:
             self.current_state_name = 'default.root'
             self.log.info('Creating new session...')
-            counter = 0
-            history = []
-            self.init_flows()
             self.logger.log_user(self.session)
-        self.context = Context(entities=entities, history=history, counter=counter, dialog=self)  # type: Context
+
+        self.init_flows()
+        self.context = Context.from_dict(dialog=self, data=context_dict)  # type: Context
 
     def init_flows(self):
-        self.flows = {}
         flow_definitions = self.create_flows()
-        for flow_name, flow_definition in flow_definitions.items():
-            self.flows[flow_name] = Flow(flow_name, dialog=self, definition=flow_definition)
+        self.flows = load_flows_from_definitions(flow_definitions)
         self.current_state_name = 'default.root'
 
     def create_flows(self):
-        flow = {}
-        BOTS = settings.GOLEM_CONFIG.get('BOTS')
-        for module_name in BOTS:
-            module = importlib.import_module(module_name)
-            flow.update(module.flow)
-        return flow
+        import yaml
+        flows = {}
+        BOTS = settings.GOLEM_CONFIG.get('BOTS', [])
+        for filename in BOTS:
+            try:
+                with open(os.path.join(settings.BASE_DIR, filename)) as f:
+                    flows.update(yaml.load(f))
+            except OSError as e:
+                raise ValueError("Unable to open definition {}".format(filename)) from e
+        return flows
 
     @staticmethod
     def clear_chat(chat_id):
         db = get_redis()
         db.hdel('session_state', chat_id)
-        db.hdel('session_entities', chat_id)
+        db.hdel('session_context', chat_id)
+
+    def move_by_entities(self, entities):
+        self.log.warning("Not accepted, moving to default.root!")
+        self.move_to('default.root:accept')
+        # TODO instead of this, first check for states in this flow that accept the entity
+        # TODO then check for states in default flow OR check for flows that accept it
 
     def process(self, message_type, entities):
         self.session.interface.processing_start(self.session)
@@ -91,6 +95,8 @@ class DialogManager:
         self.log.info('-- USER message ----------------------------------')
 
         # if message_type != 'schedule':
+        # TODO don't increment when @ requires -> input and it's valid
+        # TODO what to say and do on invalid requires -> input?
         self.context.counter += 1
 
         entities = self.context.add_entities(entities)
@@ -105,9 +111,16 @@ class DialogManager:
 
         if not self.check_state_transition():
             if not self.check_intent_transition():
-                # run the action
-                self.run_accept(save_identical=True)
-                self.save_state()
+                # TODO somebody might want _message_text and intent locked for freetext/human
+                acceptable_entities = list(filter(lambda e: e.startswith("_"), entities.keys()))
+                # blame the dialog designer for bad postbacks ... but it's a good idea to prefix special entities with _
+                if message_type != 'message' or self.get_flow().accepts_message(acceptable_entities):
+                    self.run_accept(save_identical=True)
+                    self.save_state()
+                else:
+                    self.log.debug("Unsupported entity, moving to default.root")
+                    self.move_by_entities(entities)
+                    self.save_state()
 
         self.session.interface.processing_end(self.session)
 
@@ -146,9 +159,9 @@ class DialogManager:
         if not record:
             return False
         if record_age == 0:
-            if record == 'start':
+            if record.value == 'start':
                 self.send_response(ConversationTestRecorder.record_start())
-            elif record == 'stop':
+            elif record.value == 'stop':
                 self.send_response(ConversationTestRecorder.record_stop())
             else:
                 self.send_response("Use /test_record/start/ or /test_record/stop/")
@@ -160,47 +173,38 @@ class DialogManager:
         return False
 
     def run_accept(self, save_identical=False):
-        self.log.warn('Running ACCEPT action of {}'.format(self.current_state_name))
         state = self.get_state()
-        if not state.accept:
-            self.log.warn('State does not have an ACCEPT action, we are done.')
-            return
-        response, new_state_name = state.accept(
-            state=state)  # FIXME <-- don't crash on invalid return value (not iterable)
-        self.send_response(response)
-        self.move_to(new_state_name, save_identical=save_identical)
-
-    def run_init(self):
-        self.log.warning('Running INIT action of {}'.format(self.current_state_name))
-        state = self.get_state()
-        if not state.init:
-            self.log.warning('State does not have an INIT action, we are done.')
-            return
-        response, new_state_name = state.init(state=state)
-        self.send_response(response)
-        self.move_to(new_state_name)
+        if self.current_state_name != 'default.root' and not state.check_requirements(self.context):
+            # TODO should they be checked when moving or always?
+            # TODO i would go with always as the user's code might depend on the entities being non-null
+            requirement = state.get_first_requirement(self.context)
+            requirement.action(dialog=self)
+        else:
+            if not state.action:
+                self.log.warning('State does not have an action.')
+                return
+            state.action(dialog=self)
 
     def check_state_transition(self):
-        new_state_name = self.context.get('_state', max_age=0)
+        new_state_name = self.context._state.current_v()  #get('_state', max_age=0)
         return self.move_to(new_state_name)
 
     def check_intent_transition(self):
-        intent = self.context.get('intent', max_age=0)
+        intent = self.context.intent.current_v()
         if not intent:
             return False
-        # Get custom intent transition
-        new_state_name = self.get_state().get_intent_transition(intent)
+        # FIXME Get custom intent transition
+        new_state_name = None # self.get_state().get_intent_transition(intent)
         # If no custom intent transition present, move to the flow whose 'intent' field matches intent
         # Check accepted intent of the current flow's states
         if not new_state_name:
-            for state in self.get_flow().states.values():
-                if state.intent and re.match(state.intent, intent):
-                    new_state_name = state.name
-                    break
+            flow = self.get_flow()
+            new_state_name = flow.get_state_for_intent(intent)
+
         # Check accepted intent of all flows
         if not new_state_name:
             for flow in self.flows.values():
-                if re.match(flow.intent, intent):
+                if flow.matches_intent(intent):
                     new_state_name = flow.name + '.root'
                     break
 
@@ -208,9 +212,9 @@ class DialogManager:
             self.log.error('Error! Found intent "%s" but no flow present for it!' % intent)
             return False
 
-        new_state_name = new_state_name + ':accept'
-        self.log.info('Moving based on intent %s...' % (intent))
-        return self.move_to(new_state_name)
+        # new_state_name = new_state_name + ':accept'
+        self.log.info('Moving based on intent %s...' % intent)
+        return self.move_to(new_state_name + ":")  # : runs the action
 
     def get_flow(self, flow_name=None):
         if not flow_name:
@@ -255,10 +259,10 @@ class DialogManager:
                 ConversationTestRecorder.record_state_change(self.current_state_name)
 
             try:
-
-                if action == 'init':
-                    self.run_init()
-                elif action == 'accept':
+                if previous_state != new_state_name and action != 'init':
+                    logging.info("Moving from {} to {} and executing action".format(
+                        previous_state, new_state_name
+                    ))
                     self.run_accept()
 
             except Exception as e:
@@ -287,10 +291,8 @@ class DialogManager:
             return
         self.log.info('Saving state at %s' % (self.current_state_name))
         self.db.hset('session_state', self.session.chat_id, self.current_state_name)
-        self.db.hset('session_history', self.session.chat_id, json.dumps(self.context.history, default=json_serialize))
-        self.db.hset('session_entities', self.session.chat_id,
-                     json.dumps(self.context.entities, default=json_serialize))
-        self.db.hset('session_counter', self.session.chat_id, self.context.counter)
+        context_json = json.dumps(self.context.to_dict(), default=json_serialize)
+        self.db.hset('session_context', self.session.chat_id, context_json)
         self.db.hset('session_interface', self.session.chat_id, self.session.interface.name)
         self.db.set('dialog_version', DialogManager.version)
 
@@ -298,13 +300,13 @@ class DialogManager:
         session = json.dumps(self.session.to_json())
         self.db.hset("chat_session", self.session.chat_id, session)
 
-    def send_response(self, responses):
+    def send_response(self, responses, next=None):
         if not responses:
             return
         self.log.info('-- CHATBOT message -------------------------------')
 
-        if not isinstance(responses, list):
-            return self.send_response([responses])
+        if not (isinstance(responses, list) or isinstance(responses, tuple)):
+            return self.send_response([responses], next)
 
         for response in responses:
             if isinstance(response, str):
@@ -325,6 +327,9 @@ class DialogManager:
             # text = response.text if hasattr(response, 'text') else (response if isinstance(response, str) else None)
             # if text and self.should_log_messages:
             #     message_logger.on_message.delay(self.session, text, self, from_user=False)
+
+        if next is not None:
+            self.move_to(next)  # TODO we can either have ':init' or a bool parameter
 
     def dont_understand(self):
         # TODO log to chatbase
