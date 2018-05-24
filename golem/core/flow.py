@@ -154,6 +154,7 @@ class NewState:
             reqs.append(Requirement(
                 slot=req.get("slot"),
                 entity=req.get("entity"),
+                filter=req.get("filter"),
                 action=NewState.make_action(req.get("action"))
             ))
 
@@ -167,14 +168,14 @@ class NewState:
     def check_requirements(self, context) -> bool:
         """Checks whether the requirements of this state are met."""
         for requirement in self.requires:
-            if requirement.entity not in context:
+            if not requirement.matches(context):
                 return False
         return True
 
     def get_first_requirement(self, context):
         """Returns the first requirement of this state."""
         for requirement in self.requires:
-            if requirement.entity not in context:
+            if not requirement.matches(context):
                 return requirement
         return True
 
@@ -241,12 +242,23 @@ class NewFlow:
 
 
 class Requirement():
-    def __init__(self, slot, entity, message=None, action=None):
+    def __init__(self, slot, entity, filter=None, message=None, action=None):
         self.slot = slot
         self.entity = entity
+        self.filter = filter
         self.action = action or dynamic_response_fn(message)
         if not self.action:
             raise ValueError("Requirement has no message nor action")
+
+        def matches(self, context) -> bool:
+            if self.entity not in context:
+                return False
+            if self.filter is not None:
+                from golem.core.entity_query import EntityQuery
+                # TODO move to new class PreparedFilter
+                eq = EntityQuery.from_yaml(context, self.entity, self.filter)
+                return eq != 0
+            return True
 
 
 def load_flows_from_definitions(data: dict):
