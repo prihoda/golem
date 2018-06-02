@@ -2,9 +2,7 @@ import json
 import logging
 import time
 
-import importlib
 import os
-import re
 from django.conf import settings
 
 from golem.core.chat_session import ChatSession
@@ -12,7 +10,7 @@ from golem.core.responses import LinkButton
 from golem.core.responses.responses import TextMessage
 from golem.tasks import accept_inactivity_callback, accept_schedule_callback
 from .context import Context
-from .flow import Flow, load_flows_from_definitions
+from .flow import load_flows_from_definitions
 from .logger import MessageLogging
 from .persistence import get_redis
 from .serialize import json_deserialize, json_serialize
@@ -44,6 +42,13 @@ class DialogManager:
 
             state = self.db.hget('session_state', self.session.chat_id).decode('utf-8')
             self.log.info('Session exists at state %s' % state)
+
+            if not state:
+                logging.error("State was NULL, sending user to default.root!")
+                state = 'default.root'
+            elif state.endswith(':'):
+                state = state[:-1]  # to avoid infinite loop
+
             self.move_to(state, initializing=True)
             # self.log.info(entities_string)
             context_string = self.db.hget('session_context', self.session.chat_id)
@@ -116,8 +121,13 @@ class DialogManager:
                 acceptable_entities = list(filter(lambda e: e.startswith("_"), entities.keys()))
                 # blame the dialog designer for bad postbacks ... but it's a good idea to prefix special entities with _
                 if message_type != 'message' or self.get_flow().accepts_message(acceptable_entities):
-                    self.run_accept(save_identical=True)
-                    self.save_state()
+                    if self.get_state().is_temporary:
+                        # execute default action TODO stay here, like fake root
+                        self.move_by_entities(entities)
+                        self.save_state()
+                    else:
+                        self.run_accept(save_identical=True)
+                        self.save_state()
                 else:
                     self.log.debug("Unsupported entity, moving to default.root")
                     self.move_by_entities(entities)
@@ -179,12 +189,22 @@ class DialogManager:
             # TODO should they be checked when moving or always?
             # TODO i would go with always as the user's code might depend on the entities being non-null
             requirement = state.get_first_requirement(self.context)
-            requirement.action(dialog=self)
+            # run the requirement
+            retval = requirement.action(dialog=self)
+            # send a response if given in return value
+            if isinstance(retval, tuple):
+                msg, next = retval
+                self.send_response(msg, next)
         else:
             if not state.action:
                 self.log.warning('State does not have an action.')
                 return
-            state.action(dialog=self)
+            # run the action
+            retval = state.action(dialog=self)
+            # send a response if given in return value
+            if isinstance(retval, tuple):
+                msg, next = retval
+                self.send_response(msg, next)
 
     def check_state_transition(self):
         new_state_name = self.context._state.current_v()  #get('_state', max_age=0)
@@ -229,15 +249,18 @@ class DialogManager:
 
     def move_to(self, new_state_name, initializing=False, save_identical=False):
         # if flow prefix is not present, add the current one
-        action = 'init'
         if isinstance(new_state_name, int):
             new_state = self.context.get_history_state(new_state_name - 1)
             new_state_name = new_state['name'] if new_state else None
-            action = None
         if not new_state_name:
             new_state_name = self.current_state_name
+
         if new_state_name.count(':'):
             new_state_name, action = new_state_name.split(':', 1)
+            action = True
+        else:
+            action = False
+
         if ('.' not in new_state_name):
             new_state_name = self.current_state_name.split('.')[0] + '.' + new_state_name
         if not self.get_state(new_state_name):
@@ -260,7 +283,7 @@ class DialogManager:
                 ConversationTestRecorder.record_state_change(self.current_state_name)
 
             try:
-                if previous_state != new_state_name and action != 'init':
+                if previous_state != new_state_name and action:
                     logging.info("Moving from {} to {} and executing action".format(
                         previous_state, new_state_name
                     ))

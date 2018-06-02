@@ -1,6 +1,5 @@
 import importlib
 import re
-from typing import Iterable
 
 from golem.core.responses import AttachmentMessage
 from .templates import Templates
@@ -74,18 +73,22 @@ def require_one_of(entities=[]):
 
 
 class NewState:
-    def __init__(self, name: str, action, intent=None, requires=None):
+    def __init__(self, name: str, action, intent=None, requires=None, is_temporary=False):
         """
         Construct a conversation state.
-        :param name:    name of this state
-        :param action:  function that will run when moving to this state
+        :param name:            name of this state
+        :param action:          function that will run when moving to this state
         :param intent
         :param requires
+        :param is_temporary     whether the action should fire just once,
+                                 after that, the state will be used just as a basis for transitions
+                                 and unrecognized messages will move to default.root instead.
         """
         self.name = str(name)
         self.action = action
         self.intent = intent
         self.requires = requires
+        self.is_temporary = is_temporary
 
     @staticmethod
     def load(definition: dict) -> tuple:
@@ -96,19 +99,27 @@ class NewState:
             action = NewState.make_action(action)
         requires = NewState.parse_requirements(definition.get('require'))
         intent = definition.get("intent")
-        s = NewState(name=name, action=action, intent=intent, requires=requires)
+        is_temporary = definition.get("temporary")
+        s = NewState(name=name, action=action, intent=intent, requires=requires, is_temporary=is_temporary)
         return name, s
 
     @staticmethod
-    def make_action(action):
+    def make_action(action, base=None):  # TODO support relative paths, discovery or what
         if callable(action):
             # action already given as object, everything ok
             return action
         elif isinstance(action, str):
             # dynamically load the function
+
             try:
-                module_name, fn_name = action.rsplit(".", maxsplit=1)
-                module = importlib.import_module(module_name)
+                rel_module, fn_name = action.rsplit(".", maxsplit=1)
+                # TODO support relative imports in YAML
+                try:
+                    abs_module = base + "." + rel_module
+                    module = importlib.import_module(abs_module)
+                except:
+                    module = importlib.import_module(rel_module)
+
                 fn = getattr(module, fn_name)
                 return fn
             except Exception as e:

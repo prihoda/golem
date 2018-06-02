@@ -155,7 +155,7 @@ def train_entity(batcher, entity_name, entity_dir, num_iterations):
     Trains a model for recognizing entity based on x, y.
     """
     print("[Training entity {} for {} iterations]".format(entity_name, num_iterations))
-    model = RecurrentIntentModel(entity_name, entity_dir)
+    model = RecurrentIntentModel(entity_name, entity_dir, is_training=True)
     model.train(batcher, batcher.iterations, batcher.keep_prob)
     model.destroy()
 
