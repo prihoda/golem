@@ -13,7 +13,7 @@
         <p id="login-text">What's your name?</p>
         <form class="login-form" method="post">
             {% csrf_token %}
-            <input class="text-input" type="text" name="username" placeholder="Username">
+            <input class="text-input" type="text" name="username" placeholder="Username" autocomplete="off">
             <br>
             <input class="material-button" type="image"
                    src="{% static 'images/ic_keyboard_arrow_right_black_24px.svg' %}">
@@ -43,7 +43,7 @@
 </script>
 <style>
     @import url('https://fonts.googleapis.com/css?family=Montserrat:500,700');
-    @import url('https://fonts.googleapis.com/css?family=Ubuntu:400,500');
+    @import url('https://fonts.googleapis.com/css?family=Ubuntu:400,500|Raleway:800');
 
     body {
         background-color: #eeeeee;
@@ -69,9 +69,9 @@
     }
 
     #login-title {
-        color: #00BCD4;
-        font-family: 'Ubuntu', sans-serif;
-        font-weight: 500;
+        color: #0060ff;
+        font-family: 'Raleway', sans-serif;
+        font-weight: 800;
     }
 
     #login-text {
@@ -112,7 +112,7 @@
         margin-right: 16px;
         right: 10%;
         bottom: 10%;
-        background-color: #1DE9B6;
+        background-color: #2477e9;
         box-shadow: 0 5px 5px #e0e0e0;
         outline: 0;
     }

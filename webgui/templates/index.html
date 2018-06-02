@@ -19,7 +19,9 @@
                 <img class="circle-image" src="{% static bot_img %}"
                      onerror='this.onerror=null; this.src="https://placehold.it/100x100"'/> {% endif %}
                 <div class="msg" style="text-align: {% if m.is_response %} left {% else %} right {% endif %}">
-                    <div class="bubble"><span class="text">{{ m.text }}</span></div>
+                    <div class="bubble {% if m.is_response %} left-bubble {% else %} right-bubble {% endif %}">
+                        <span class="text">{{ m.text }}</span>
+                    </div>
 
                     <div class="msg_elements">
                         {% for e in m.get_elements %}
@@ -147,32 +149,35 @@
 
 <style>
     @import url('https://fonts.googleapis.com/css?family=Roboto');
+    @import url('https://fonts.googleapis.com/css?family=Oxygen|Raleway:800');
+
 
     body {
-        background-color: #eeeeee;
+        background-color: white;
         display: flex;
-        height: 100vh;
         flex-direction: column;
+        height: 100vh;
         margin: 0;
     }
 
     #header {
         position: -webkit-sticky;
         top: 0;
-        background-color: #00d1eb;
+        background-color: #0d6ceb;
         box-shadow: 0 4px 12px #aaaaaa;
         width: 100%;
         height: auto;
         z-index: 100;
+        margin-bottom: 8px;
     }
 
     #header > h1 {
-        font-family: "Roboto", sans-serif;
+        font-family: "Raleway", sans-serif;
         text-align: center;
         font-size: x-large;
         color: white;
         padding: 5px 10%;
-        font-weight: 500;
+        font-weight: 800;
         z-index: 10;
         display: inline-block;
     }
@@ -180,8 +185,9 @@
     #footer {
         width: 100vw;
         position: -webkit-sticky;
+        margin-top: auto;
         bottom: 0;
-        padding: 10px 0;
+        padding-bottom: 10px;
         background-color: white;
         z-index: 100;
     }
@@ -221,7 +227,7 @@
     }
 
     .message_container {
-        font-family: "Roboto", sans-serif;
+        font-family: 'Oxygen', sans-Serif;
         font-weight: 400;
         margin: 5px;
         clear: both;
@@ -246,7 +252,6 @@
         border-radius: 100%;
         position: relative;
         display: inline-block;
-    {#        background-color: #eaeaea;#}
     }
 
     .msg {
@@ -264,14 +269,33 @@
     }
 
     .bubble {
-        background-color: #00d1eb;
+        background: rgb(59, 172, 196);
+        background: linear-gradient(90deg, rgba(59, 172, 196, 1) 0%, rgba(43, 103, 204, 1) 100%);
         color: white;
         padding: 8px 24px;
         margin-left: 16px;
         margin-right: 16px;
         border-radius: 20px;
-        z-index: 0;
-    {#        line-height: 200%; TODO add this it looks cool #}
+        z-index: 1;
+        line-height: 200%;
+    }
+
+    .right-bubble:after {
+        content: "";
+        width: 0;
+        height: 0;
+        background: transparent;
+
+        /*position: absolute;*/
+        /*right: 16px;*/
+        /*bottom: 10px;*/
+        /*border-left: 25px solid transparent;*/
+        /*border-bottom: 25px solid transparent;*/
+        /*border-right: 20px solid rgba(43,103,204,1);*/
+    }
+
+    .left-bubble {
+
     }
 
     .msg + .time {
