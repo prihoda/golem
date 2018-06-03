@@ -3,13 +3,19 @@ import time
 
 from golem.core.chat_session import ChatSession
 from golem.core.logging.abs_logger import MessageLogger
-from golem.core.persistence import get_elastic
+
+
+def get_elastic():
+    from elasticsearch import Elasticsearch
+    config = settings.GOLEM_CONFIG.get('ELASTIC')
+    if not config:
+        return None
+    return Elasticsearch(config['HOST'], port=config['PORT'])
 
 
 class ElasticsearchLogger(MessageLogger):
     def __init__(self):
         super().__init__()
-        self.enabled = bool(get_elastic())
         self.test_id = -1  # FIXME
 
     def log_user_message(self, dialog, time, state, message, type_, entities):
@@ -63,8 +69,6 @@ class ElasticsearchLogger(MessageLogger):
         self._log_message(message)
 
     def _log_message(self, message):
-        if not self.enabled:
-            return
         es = get_elastic()
         if not es:
             return
@@ -74,8 +78,6 @@ class ElasticsearchLogger(MessageLogger):
             print('Unable to log message to Elasticsearch.')
 
     def log_user(self, dialog, session: ChatSession):
-        if not self.enabled:
-            return
         user = {
             'uid': session.chat_id,
             'profile': session.profile.to_json() if session.profile else None

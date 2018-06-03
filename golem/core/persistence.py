@@ -20,11 +20,3 @@ def get_redis():
     if not _redis:
         _redis = redis.StrictRedis(connection_pool=_connection_pool)
     return _redis
-
-
-def get_elastic():
-    from elasticsearch import Elasticsearch
-    config = settings.GOLEM_CONFIG.get('ELASTIC')
-    if not config:
-        return None
-    return Elasticsearch(config['HOST'], port=config['PORT'])
