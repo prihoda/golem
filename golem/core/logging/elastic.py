@@ -7,6 +7,7 @@ from golem.core.logging.abs_logger import MessageLogger
 
 def get_elastic():
     from elasticsearch import Elasticsearch
+    from django.conf import settings
     config = settings.GOLEM_CONFIG.get('ELASTIC')
     if not config:
         return None
