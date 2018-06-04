@@ -7,7 +7,6 @@ import urllib.request
 import zipfile
 
 import os
-import pip
 
 
 def yesno():
@@ -47,12 +46,14 @@ def download_and_unzip(name, weburl):
         os.remove(golm_file)
 
 
-def golm_init():
+def golm_init(bot_name=None):
     if not hasattr(sys, 'real_prefix'):
         print("Warning: We recommend using a virtual environment, do you want to continue? [y/n]")
         yesno()
 
-    bot_name = input("How do you want to call your chatbot?\n")
+    if not bot_name:
+        bot_name = input("How do you want to call your chatbot?\n")
+
     if ('/' in bot_name) or ('\0' in bot_name) or ('\\' in bot_name):
         print("Error: Directory name contains invalid characters", file=sys.stderr)
         exit(1)
@@ -78,7 +79,8 @@ def golm_init():
     download_and_unzip('skeleton project', "https://github.com/mzilinec/golem-example-chatbot/archive/master.zip")
 
     print("Installing requirements ...")
-    retval = pip.main(['install', '-r', 'requirements.txt'])
+    # unfortunately, pip > 10 doesn't support main() anymore
+    retval = subprocess.call(['pip3', 'install', '-r', 'requirements.txt'])
     if retval != 0:
         print("Error in pip install", file=sys.stderr)
         exit(1)
@@ -126,7 +128,7 @@ if __name__ == "__main__":
     command = args.command[0]
 
     if command == 'init':
-        golm_init()
+        golm_init(args.djangoapp)
     elif command == 'start':
         if args.djangoapp is None:
             argp.error("Django app name must be specified.")
