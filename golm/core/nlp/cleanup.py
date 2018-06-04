@@ -1,8 +1,8 @@
 import re
 
-from golm_main.nlp.tools.czech_stemmer import cz_stem_all
-from golm_main.nlp.tools.porter2 import Stemmer
-from golm_main.nlp.tools.toktok import ToktokTokenizer
+from core.nlp.tools.czech_stemmer import cz_stem_all
+from core.nlp.tools.porter2 import Stemmer
+from core.nlp.tools.toktok import ToktokTokenizer
 
 tokenizer = ToktokTokenizer()
 

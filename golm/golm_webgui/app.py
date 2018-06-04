@@ -1,10 +1,10 @@
 from django.apps import AppConfig
 
-from golem.core.interfaces import all
+from core.interfaces import all
 
 
 class WebGui(AppConfig):
-    name = 'webgui'
+    name = 'golm_webgui'
     prefix = 'web'
     verbose_name = "Chatbot web GUI"
 

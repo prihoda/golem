@@ -4,16 +4,16 @@ import time
 
 import random
 
-from golem.core.chat_session import ChatSession
-from golem.core.message_parser import parse_text_message
-from golem.core.responses.buttons import PayloadButton
-from golem.core.responses.quick_reply import LocationQuickReply
-from golem.tasks import accept_user_message
+from core.chat_session import ChatSession
+from core.message_parser import parse_text_message
+from core.responses.buttons import PayloadButton
+from core.responses.quick_reply import LocationQuickReply
+from core.tasks import accept_user_message
 from .models import Message, Button, Element
 
 
 class WebGuiInterface:
-    name = 'webgui'
+    name = 'golm_webgui'
     prefix = 'web'
     messages = []
     states = []
@@ -108,7 +108,7 @@ class WebGuiInterface:
             if isinstance(data, dict):
                 return {'entities': data, 'type': 'postback'}
             else:
-                from golem.core.serialize import json_deserialize
+                from core.serialize import json_deserialize
                 payload = json.loads(data, object_hook=json_deserialize)
                 payload['_message_text'] = [{'value': None}]
                 return {'entities': payload, 'type': 'postback'}

@@ -1,8 +1,8 @@
 import json
 from abc import ABC, abstractmethod
 
-from golm_admin.core.responses.responses import MessageElement
-from golm_admin.core.serialize import json_serialize
+from core.responses.responses import MessageElement
+from core.serialize import json_serialize
 
 
 class Button(MessageElement, ABC):

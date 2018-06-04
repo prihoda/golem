@@ -6,10 +6,10 @@ from typing import Optional
 import requests
 from django.conf import settings
 
-from golm_admin.core.interfaces.adapter.microsoft import MicrosoftAdapter
-from golm_admin.core.message_parser import parse_text_message
-from golm_admin.core.persistence import get_redis
-from golm_admin.tasks import accept_user_message
+from core.interfaces.adapter.microsoft import MicrosoftAdapter
+from core.message_parser import parse_text_message
+from core.persistence import get_redis
+from core.tasks import accept_user_message
 
 
 # FIXME needs to be updated

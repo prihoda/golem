@@ -1,4 +1,4 @@
-from golm_admin.core.responses.responses import MenuElement
+from core.responses.responses import MenuElement
 
 
 class ThreadSetting():

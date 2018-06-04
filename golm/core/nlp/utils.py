@@ -6,8 +6,8 @@ from typing import List
 import logging
 from django.conf import settings
 
-from golm_main.nlp import cleanup
-from golm_main.nlp.data_model import Entity
+from core.nlp import cleanup
+from core.nlp.data_model import Entity
 
 
 def get_entity_names() -> List:
@@ -26,7 +26,7 @@ _nlp = None
 
 
 def get_glove():
-    from golm_main.nlp.glove import GloVe
+    from core.nlp.glove import GloVe
     global _glove
     if _glove is None:
         glove_dir = settings.NLP_CONFIG.get('GLOVE_DIR')

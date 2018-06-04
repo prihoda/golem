@@ -61,7 +61,7 @@ def do_logout(request):
         WebGuiInterface.destroy_uid(request.session['uid'])
         del request.session['uid']
         del request.session['username']
-    return redirect('webgui')
+    return redirect('golm_webgui')
 
 
 def get_last_change(request):

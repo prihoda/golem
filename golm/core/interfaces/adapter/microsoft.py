@@ -1,6 +1,6 @@
-from golm_admin.core.responses.buttons import *
-from golm_admin.core.responses.responses import *
-from golm_admin.core.responses.templates import *
+from core.responses.buttons import *
+from core.responses.responses import *
+from core.responses.templates import *
 
 
 class MicrosoftAdapter():

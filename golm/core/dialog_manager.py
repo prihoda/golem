@@ -6,10 +6,10 @@ import importlib
 import re
 from django.conf import settings
 
-from golm_admin.core import message_logger
-from golm_admin.core.chat_session import ChatSession
-from golm_admin.core.responses.responses import TextMessage
-from golm_admin.tasks import accept_inactivity_callback, accept_schedule_callback
+from core import message_logger
+from core.chat_session import ChatSession
+from core.responses.responses import TextMessage
+from core.tasks import accept_inactivity_callback, accept_schedule_callback
 from .context import Context
 from .flow import Flow
 from .logger import Logger

@@ -10,19 +10,19 @@ with open(os.path.join(os.path.dirname(__file__), 'README.md')) as readme:
 os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
-    name='django-golem',
-    version='0.9-beta',
+    name='golm',
+    version='0.9.1-beta',
     packages=find_packages(),
     include_package_data=True,
     license='Apache Software License',
-    description='Framework for creating chatbots on Django for Messenger and other platforms.',
+    description='Framework for creating chatbots for Messenger and other platforms.',
     long_description=README,
-    url='https://github.com/prihoda/golem',
+    url='https://github.com/prihoda/golm',
     author='David Příhoda, Jakub Drdák, Matúš Žilinec',
     author_email='david.prihoda@gmail.com',
     entry_points={
           'console_scripts': [
-              'golem-admin = golem.core.admin:main'
+              'golm = golm.console:main'
           ]
       },
     classifiers=[
@@ -39,6 +39,6 @@ setup(
         'Topic :: Internet :: WWW/HTTP',
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
     ],
-    install_requires=['django', 'networkx','requests','six','sqlparse','wit','wheel','redis',
-    'pytz','unidecode','emoji','elasticsearch','celery','dateutil'],
+    install_requires=['django==2.0.3','requests','wit','wheel','redis',
+    'pytz','unidecode','emoji','celery==4.0.2','python-dateutil'],
 )

@@ -7,7 +7,7 @@ def register_chat_interface(interface):
     """
     Registers a chat interface.
     :param interface: Class of the interface to register.
-                      See golm_admin.core.interfaces for reference.
+                      See core.interfaces for reference.
     """
     interfaces.append(interface)
 
@@ -16,10 +16,10 @@ def get_interfaces():
     """
     :returns: List of all registered chat interface classes.
     """
-    from golm_admin.core.interfaces.facebook import FacebookInterface
-    from golm_admin.core.interfaces.telegram import TelegramInterface
-    from golm_admin.core.interfaces.microsoft import MicrosoftInterface
-    from golm_admin.core.interfaces.test import TestInterface
+    from core.interfaces.facebook import FacebookInterface
+    from core.interfaces.telegram import TelegramInterface
+    from core.interfaces.microsoft import MicrosoftInterface
+    from core.interfaces.test import TestInterface
     return interfaces + [FacebookInterface, TelegramInterface, MicrosoftInterface, TestInterface]
 
 
@@ -48,7 +48,7 @@ def init_webhooks():
     """
     logging.debug('Trying to register telegram webhook')
     try:
-        from golm_admin.core.interfaces.telegram import TelegramInterface
+        from core.interfaces.telegram import TelegramInterface
         TelegramInterface.init_webhooks()
     except Exception as e:
         logging.exception('Couldn\'t init webhooks')

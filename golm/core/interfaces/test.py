@@ -1,4 +1,4 @@
-from golm_admin.core.chat_session import ChatSession, Profile
+from core.chat_session import ChatSession, Profile
 
 class TestInterface():
     name = 'test'

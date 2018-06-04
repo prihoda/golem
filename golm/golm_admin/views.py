@@ -96,7 +96,7 @@ class SkypeView(generic.View):
 @login_required
 def index(request):
     context = {}
-    template = loader.get_template('golm_main/index.html')
+    template = loader.get_template('golm_admin/index.html')
     return HttpResponse(template.render(context, request))
 
 
@@ -150,7 +150,7 @@ def test(request):
             avg[key] = avg[key] / passed
 
     context = {'tests':results, 'avg':avg, 'status':status, 'updated_time' : updated_time}
-    template = loader.get_template('golm_main/test.html')
+    template = loader.get_template('golm_admin/test.html')
     return HttpResponse(template.render(context, request))
 
 def run_test(request, name):
@@ -221,7 +221,7 @@ def log_tests(request):
     context = {
         'groups' : test_ids
     }
-    template = loader.get_template('golm_main/log.html')
+    template = loader.get_template('golm_admin/log.html')
     return HttpResponse(template.render(context,request))
 
 @login_required
@@ -278,7 +278,7 @@ def log(request, user_limit):
     }
 
     print(users)
-    template = loader.get_template('golm_main/log.html')
+    template = loader.get_template('golm_admin/log.html')
     return HttpResponse(template.render(context,request))
 
 def log_conversation(request, group_id=None, page=1):
@@ -325,7 +325,7 @@ def log_conversation(request, group_id=None, page=1):
         messages.append(message)
 
     context = {'messages': messages}
-    template = loader.get_template('golm_main/log_conversation.html')
+    template = loader.get_template('golm_admin/log_conversation.html')
     return HttpResponse(template.render(context,request))
 
 def debug(request):
@@ -335,9 +335,9 @@ def debug(request):
 
 
 def users_view(request):
-    from golm_main.models import User
+    from golm_admin.models import User
     offset = int(request.GET.get("offset", 0))
     limit = int(request.GET.get("limit", 50))
     users = User.objects.all().order_by("uid")[offset:limit + offset]
     context = {"users": users, "next_offset": offset + limit, "prev_offset": offset - limit}
-    return render(request, "golm_main/users.html", context)
+    return render(request, "golm_admin/users.html", context)

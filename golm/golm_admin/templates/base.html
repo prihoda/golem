@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>{% block title %}Golem{% endblock %} - Prague Visitor Chatbot</title>
+  <title>{% block title %}Admin{% endblock %} - golm.ai</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style type="text/css">
   body{
@@ -25,13 +25,8 @@
   <div class="row">
     <div class="col-xs-12" id="toolbar">
       <div class="btn-group" role="group">
-        <a href="/content/templates/" class="btn btn-default {% if request.path == '/content/templates/' %}btn-info active{% endif %}">Templates</a>
-        <a href="/content/preview/" class="btn btn-default {% if request.path == '/content/preview/' %}btn-info active{% endif %}">Content</a>
-        <a href="/content/export/" class="btn btn-default {% if request.path == '/content/export/' %}btn-info active{% endif %}">Export</a>
-        <a href="/content/stats/" class="btn btn-default {% if request.path == '/content/stats/' %}btn-info active{% endif %}">Stats</a>
-        <a href="/golem/log/" class="btn btn-default {% if request.path == '/golem/log/' %}btn-info active{% endif %}">Messages</a>
-        <a href="/golem/log_tests/" class="btn btn-default {% if request.path == '/golem/log_tests/' %}btn-info active{% endif %}">Examples</a>
-        <a href="/golem/test/" class="btn btn-default {% if request.path == '/golem/test/' %}btn-info active{% endif %}">Tests</a>
+        <a href="/golm/" class="btn btn-default {% if request.path == '/golm/' %}btn-info active{% endif %}">Overview</a>
+        <a href="/golm/test/" class="btn btn-default {% if request.path == '/golm/test/' %}btn-info active{% endif %}">Tests</a>
       </div>
     </div>
   </div>

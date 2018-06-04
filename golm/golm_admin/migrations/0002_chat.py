@@ -9,7 +9,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('golm_main', '0001_initial'),
+        ('golm_admin', '0001_initial'),
     ]
 
     operations = [
@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
             name='Chat',
             fields=[
                 ('chat_id', models.CharField(max_length=255, primary_key=True, serialize=False)),
-                ('user_uid', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='golm_main.User')),
+                ('user_uid', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='golm_admin.User')),
             ],
         ),
     ]

@@ -2,10 +2,10 @@ import json
 import logging
 from typing import List, Optional
 
-from golm_admin.core.responses.buttons import Button, LinkButton, PayloadButton
-from golm_admin.core.responses.quick_reply import QuickReply, LocationQuickReply
-from golm_admin.core.responses.responses import *
-from golm_admin.core.responses.templates import ListTemplate
+from core.responses.buttons import Button, LinkButton, PayloadButton
+from core.responses.quick_reply import QuickReply, LocationQuickReply
+from core.responses.responses import *
+from core.responses.templates import ListTemplate
 
 
 class TelegramAdapter():
@@ -101,7 +101,7 @@ class TelegramAdapter():
                 }
             elif isinstance(button, PayloadButton):
                 payload = json.dumps(button.payload)
-                from golm_admin.core.interfaces.telegram import TelegramInterface
+                from core.interfaces.telegram import TelegramInterface
                 callback_data = TelegramInterface.persist_callback(payload)
                 key = {
                     'text': button.title,

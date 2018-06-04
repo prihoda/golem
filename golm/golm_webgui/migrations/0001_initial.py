@@ -41,11 +41,11 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='element',
             name='message',
-            field=models.ForeignKey(to='webgui.Message', on_delete=models.CASCADE),
+            field=models.ForeignKey(to='golm_webgui.Message', on_delete=models.CASCADE),
         ),
         migrations.AddField(
             model_name='button',
             name='message',
-            field=models.ForeignKey(to='webgui.Message', on_delete=models.CASCADE),
+            field=models.ForeignKey(to='golm_webgui.Message', on_delete=models.CASCADE),
         ),
     ]

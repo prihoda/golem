@@ -228,7 +228,7 @@ class GloVe:
             return None
 
         t = time.time()
-        from golm_main.nlp.tools import correct
+        from core.nlp.tools import correct
         match = correct.nearest_word(word, self)
         t = time.time() - t
         logging.warning("Nearest match: {} time: {} s".format(match, t))

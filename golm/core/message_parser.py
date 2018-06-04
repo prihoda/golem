@@ -9,7 +9,7 @@ def add_default_extractors():
     # compatibility for old chatbots
     if "WIT_TOKEN" in settings.GOLEM_CONFIG:
         print("Adding wit extractor from wit token")
-        from golm_admin.core.parsing import wit_extractor
+        from core.parsing import wit_extractor
         ENTITY_EXTRACTORS.append(wit_extractor.WitExtractor())
 
 

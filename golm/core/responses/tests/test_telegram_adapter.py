@@ -1,10 +1,10 @@
 from django.test import TestCase
 
-from golm_admin.core.interfaces.adapter.telegram import TelegramAdapter
-from golm_admin.core.responses.buttons import LinkButton, PayloadButton
-from golm_admin.core.responses.quick_reply import QuickReply
-from golm_admin.core.responses.responses import TextMessage, GenericTemplateMessage, GenericTemplateElement
-from golm_admin.core.responses.templates import ListTemplate
+from core.interfaces.adapter.telegram import TelegramAdapter
+from core.responses.buttons import LinkButton, PayloadButton
+from core.responses.quick_reply import QuickReply
+from core.responses.responses import TextMessage, GenericTemplateMessage, GenericTemplateElement
+from core.responses.templates import ListTemplate
 
 
 class TelegramAdapterTest(TestCase):

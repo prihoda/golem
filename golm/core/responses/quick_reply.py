@@ -1,7 +1,7 @@
 import json
 
-from golm_admin.core.responses.responses import MessageElement, _get_payload_string
-from golm_admin.core.serialize import json_serialize
+from core.responses.responses import MessageElement, _get_payload_string
+from core.serialize import json_serialize
 
 
 class QuickReply(MessageElement):

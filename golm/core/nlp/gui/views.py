@@ -4,7 +4,7 @@ import os
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render
 
-from golm_main.nlp.utils import get_entity_names, data_dir
+from core.nlp.utils import get_entity_names, data_dir
 import json
 
 

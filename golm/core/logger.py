@@ -1,8 +1,8 @@
 import json
 import time
 
-from golm_admin.core.chat_session import ChatSession, Profile
-from golm_admin.core.persistence import get_elastic
+from core.chat_session import ChatSession, Profile
+from core.persistence import get_elastic
 from .responses.responses import MessageElement
 
 class Logger:

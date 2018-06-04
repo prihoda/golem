@@ -108,7 +108,7 @@ class TextMessage(MessageElement):
         if self.buttons:
             raise ValueError('Cannot add quick_replies and buttons to the same message')
         elif isinstance(quick_reply, str):
-            from golm_admin.core.responses.quick_reply import QuickReply
+            from core.responses.quick_reply import QuickReply
             quick_reply = QuickReply(title=quick_reply)
 
         self.quick_replies.append(quick_reply)

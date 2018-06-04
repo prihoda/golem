@@ -1,4 +1,4 @@
-from golm_admin.core.interfaces.all import create_from_prefix
+from core.interfaces.all import create_from_prefix
 
 
 class ChatSession:

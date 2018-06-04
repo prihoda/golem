@@ -1,4 +1,4 @@
-from golm_main.nlp.cleanup import tokenize
+from core.nlp.cleanup import tokenize
 
 
 # TODO remove character accents

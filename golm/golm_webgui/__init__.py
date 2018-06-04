@@ -1,1 +1,1 @@
-default_app_config = 'webgui.app.WebGui'
+default_app_config = 'golm_webgui.app.WebGui'

@@ -8,9 +8,9 @@ import random
 import requests
 from django.conf import settings
 
-from golm_admin.core.message_parser import parse_text_message
-from golm_admin.core.persistence import get_redis
-from golm_admin.tasks import accept_user_message
+from core.message_parser import parse_text_message
+from core.persistence import get_redis
+from core.tasks import accept_user_message
 
 
 # FIXME needs to be updated
@@ -55,7 +55,7 @@ class TelegramInterface:
 
     @staticmethod
     def post_message(uid, chat_id, response):
-        from golm_admin.core.interfaces.adapter.telegram import TelegramAdapter
+        from core.interfaces.adapter.telegram import TelegramAdapter
         base_url = TelegramInterface.get_base_url()
         if not base_url:
             return

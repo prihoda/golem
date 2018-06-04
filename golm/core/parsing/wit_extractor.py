@@ -6,9 +6,9 @@ from celery.utils.log import get_task_logger
 from django.conf import settings
 from wit import Wit
 
-from golm_admin.core.parsing import date_utils
-from golm_admin.core.parsing.entity_extractor import EntityExtractor
-from golm_admin.core.persistence import get_redis
+from core.parsing import date_utils
+from core.parsing.entity_extractor import EntityExtractor
+from core.persistence import get_redis
 
 
 class WitExtractor(EntityExtractor):

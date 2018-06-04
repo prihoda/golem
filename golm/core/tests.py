@@ -2,9 +2,9 @@ import json
 import time
 import random
 
-from golm_admin.core.persistence import get_redis
-from golm_admin.core.responses.responses import *
-from golm_admin.core.responses.buttons import *
+from core.persistence import get_redis
+from core.responses.responses import *
+from core.responses.buttons import *
 from django.conf import settings
 from .interfaces.test import TestInterface
 from .message_parser import parse_text_message
@@ -236,15 +236,15 @@ class ConversationTestRecorder:
     def record_stop():
         print('Stopping recording')
         responses = []
-        responses.append(TextMessage("Done recording ;)", buttons=[{'title':'Get result', 'url':settings.GOLEM_CONFIG.get('DEPLOY_URL')+'/golm_admin/test_record'}, {'title':'Start again', 'payload':{'test_record':'start'}}]))
+        responses.append(TextMessage("Done recording ;)", buttons=[{'title':'Get result', 'url':settings.GOLEM_CONFIG.get('DEPLOY_URL')+'/test_record'}, {'title':'Start again', 'payload':{'test_record':'start'}}]))
         return responses
 
     @staticmethod
     def get_result():
         db = get_redis()
         actions = db.lrange('test_actions', 0, -1)
-        response = """from golm_admin.core.responses import *
-from golm_admin.core.tests import *
+        response = """from core.responses import *
+from core.tests import *
 
 actions = []
 """

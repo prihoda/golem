@@ -4,18 +4,18 @@ import os
 
 from django.conf import settings
 
-from golm_main.nlp.keywords import keyword_search
-from golm_main.nlp.nn.seq2seq import Seq2Seq
+from core.nlp.keywords import keyword_search
+from core.nlp.nn.seq2seq import Seq2Seq
 
 print('Will import GloVe and TF!')
 
 import numpy as np
-from golm_main.nlp import duckling, cleanup
-from golm_main.nlp.nn.model import Model
+from core.nlp import duckling, cleanup
+from core.nlp.nn.model import Model
 
 from celery.app.log import get_logger
 
-from golm_main.nlp import utils
+from core.nlp import utils
 
 logging = get_logger(__name__)
 
@@ -94,7 +94,7 @@ def classify(text: str, current_state=None):
     model_dir = os.path.join(NLP_DATA_DIR, 'model')
     dirs = [i for i in os.scandir(model_dir) if i.is_dir()]
 
-    from golm_main.nlp import geneea
+    from core.nlp import geneea
     try:
         text = geneea.get_correction(text)
         sentiment = geneea.get_sentiment(text)

@@ -6,11 +6,11 @@ import pickle
 import numpy as np
 import random
 
-from golm_main.nlp import cleanup
-from golm_main.nlp import utils
-from golm_main.nlp.keywords import prepare_keywords
-from golm_main.nlp.nn.model import Model
-from golm_main.nlp.nn.seq2seq import Seq2Seq
+from core.nlp import cleanup
+from core.nlp import utils
+from core.nlp.keywords import prepare_keywords
+from core.nlp.nn.model import Model
+from core.nlp.nn.seq2seq import Seq2Seq
 
 
 def process(entities, imputation_rules):

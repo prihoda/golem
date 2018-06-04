@@ -2,7 +2,7 @@ from django.apps import AppConfig
 
 
 class GolemConfig(AppConfig):
-    name = 'golm_main'
+    name = 'golm_admin'
 
     def ready(self):
         print('Init webhooks @ GolemConfig')

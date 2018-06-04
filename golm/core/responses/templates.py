@@ -1,6 +1,6 @@
 from typing import List
 
-from golm_admin.core.responses.responses import MessageElement, GenericTemplateElement
+from core.responses.responses import MessageElement, GenericTemplateElement
 
 
 class ListTemplate(MessageElement):

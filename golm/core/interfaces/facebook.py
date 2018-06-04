@@ -4,16 +4,16 @@ import logging
 import requests
 from django.conf import settings
 
-from golm_admin.core.chat_session import ChatSession
-from golm_admin.core.message_parser import parse_text_message
-from golm_admin.core.persistence import get_redis
-from golm_admin.core.responses.buttons import *
-from golm_admin.core.responses.quick_reply import QuickReply
-from golm_admin.core.responses.responses import *
-from golm_admin.core.responses.settings import ThreadSetting, GreetingSetting, GetStartedSetting, MenuSetting
-from golm_admin.core.responses.templates import ListTemplate
-from golm_admin.core.serialize import json_deserialize
-from golm_admin.tasks import accept_user_message
+from core.chat_session import ChatSession
+from core.message_parser import parse_text_message
+from core.persistence import get_redis
+from core.responses.buttons import *
+from core.responses.quick_reply import QuickReply
+from core.responses.responses import *
+from core.responses.settings import ThreadSetting, GreetingSetting, GetStartedSetting, MenuSetting
+from core.responses.templates import ListTemplate
+from core.serialize import json_deserialize
+from core.tasks import accept_user_message
 
 
 class FacebookInterface():
