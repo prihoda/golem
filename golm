@@ -46,7 +46,12 @@ def download_and_unzip(name, weburl):
         os.remove(golm_file)
 
 
-def golm_init(bot_name=None):
+def install_skeleton(to):
+    import golem.bootstrap
+    golem.bootstrap.install_skeleton(to)
+
+
+def golm_init(bot_name=None, clone=False):
     if not hasattr(sys, 'real_prefix'):
         print("Warning: We recommend using a virtual environment, do you want to continue? [y/n]")
         yesno()
@@ -71,19 +76,35 @@ def golm_init(bot_name=None):
 
     print("Creating a Golm project in {} ...".format(bot_name))
 
-    if not os.path.exists(bot_name):
-        os.mkdir(bot_name)
+    if do_clone:
+        # ensure django is installed
+        retval = subprocess.call(['pip3', 'install', 'django'])
+        if retval != 0:
+            print("Error in pip install", file=sys.stderr)
+            exit(1)
+
+    retval = subprocess.call(['django-admin', 'startproject', bot_name])
+    if retval != 0:
+        print("Error: Can't create a django project!")
+        exit(1)
+
     os.chdir(bot_name)
 
-    download_and_unzip('Golm', "https://github.com/prihoda/golem/archive/master.zip")
-    download_and_unzip('skeleton project', "https://github.com/mzilinec/golem-example-chatbot/archive/master.zip")
+    if do_clone:
 
-    print("Installing requirements ...")
-    # unfortunately, pip > 10 doesn't support main() anymore
-    retval = subprocess.call(['pip3', 'install', '-r', 'requirements.txt'])
-    if retval != 0:
-        print("Error in pip install", file=sys.stderr)
-        exit(1)
+        download_and_unzip('Golm', "https://github.com/prihoda/golem/archive/master.zip")
+
+        print("Installing requirements ...")
+        # unfortunately, pip > 10 doesn't support main() anymore
+        retval = subprocess.call(['pip3', 'install', '-r', 'requirements.txt'])
+        if retval != 0:
+            print("Error in pip install", file=sys.stderr)
+            exit(1)
+
+    print("Creating skeleton project ...")
+    # download_and_unzip('skeleton project', "https://github.com/mzilinec/golem-example-chatbot/archive/master.zip")
+    # install skeleton to django project module
+    install_skeleton(os.path.abspath(os.path.join(os.getcwd(), bot_name)))
 
     print("Running django migrate ...")
     retval = subprocess.call(['python3', './manage.py', 'migrate'])
@@ -123,12 +144,15 @@ if __name__ == "__main__":
     argp = argparse.ArgumentParser(description="Golm framework configuration utility")
     argp.add_argument('command', nargs=1, type=str, help="One of : init, start, help")
     argp.add_argument('djangoapp', nargs='?', help="Name of your django app.")
+    argp.add_argument("--clone", action="store_true",
+                      help="Downloads Golm from master instead of using PyPI. Only for development, don't use!")
 
     args = argp.parse_args()
     command = args.command[0]
 
     if command == 'init':
-        golm_init(args.djangoapp)
+        do_clone = args.clone
+        golm_init(args.djangoapp, do_clone)
     elif command == 'start':
         if args.djangoapp is None:
             argp.error("Django app name must be specified.")
