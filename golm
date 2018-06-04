@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+import argparse
+import signal
+import subprocess
+import sys
+import urllib.request
+import zipfile
+
+import os
+import pip
+
+
+def yesno():
+    while True:
+        response = input()
+        if response.lower() in ['y', 'yes']:
+            break
+        elif response.lower() in ['n', 'no']:
+            exit(-1)
+
+
+def download_and_unzip(name, weburl):
+    golm_file = None
+
+    try:
+        print("Downloading {} ...".format(name))
+        # TODO use a release instead of the master branch!
+        golm_file, headers = urllib.request.urlretrieve(weburl, "{}.zip".format(name))
+    except Exception as e:
+        print("Error downloading Golm: {}".format(e), file=sys.stderr)
+        exit(1)
+
+    try:
+        print("Unpacking {} ...".format(name))
+        zip = zipfile.ZipFile(golm_file, 'r')
+        dirname = zip.namelist()[0]  # golem-master
+        for file in zip.infolist():
+            if file.filename == dirname:
+                continue
+            file.filename = file.filename.split(dirname, 1)[1]
+            zip.extract(file, '.')
+        zip.close()
+    except Exception as e:
+        print("Error unpacking: {}".format(e), file=sys.stderr)
+        exit(1)
+    finally:
+        os.remove(golm_file)
+
+
+def golm_init():
+    if not hasattr(sys, 'real_prefix'):
+        print("Warning: We recommend using a virtual environment, do you want to continue? [y/n]")
+        yesno()
+
+    bot_name = input("How do you want to call your chatbot?\n")
+    if ('/' in bot_name) or ('\0' in bot_name) or ('\\' in bot_name):
+        print("Error: Directory name contains invalid characters", file=sys.stderr)
+        exit(1)
+    elif not bot_name:
+        print("Error: Directory name is empty", file=sys.stderr)
+        exit(1)
+
+    if os.path.exists(bot_name):
+        if os.path.isdir(bot_name):
+            print("Warning: Directory {} exists, do you want to continue? [y/n]".format(bot_name))
+            yesno()
+        else:
+            print("Error: File {} already exists".format(bot_name), file=sys.stderr)
+            exit(1)
+
+    print("Creating a Golm project in {} ...".format(bot_name))
+
+    if not os.path.exists(bot_name):
+        os.mkdir(bot_name)
+    os.chdir(bot_name)
+
+    download_and_unzip('Golm', "https://github.com/prihoda/golem/archive/master.zip")
+    download_and_unzip('skeleton project', "https://github.com/mzilinec/golem-example-chatbot/archive/master.zip")
+
+    print("Installing requirements ...")
+    retval = pip.main(['install', '-r', 'requirements.txt'])
+    if retval != 0:
+        print("Error in pip install", file=sys.stderr)
+        exit(1)
+
+    print("Running django migrate ...")
+    retval = subprocess.call(['python3', './manage.py', 'migrate'])
+    if retval != 0:
+        print("Error in manage.py migrate", file=sys.stderr)
+        exit(1)
+
+    print("Everything looks OK!")
+    print("You can start the server inside the directory with: golm start [django-app]")
+
+
+def golm_start(djangoapp):
+    # TODO handle errors
+
+    print("Starting Redis database ...")
+    redis = subprocess.Popen(["redis-server"])
+
+    print("Starting Celery ...")
+    django = subprocess.Popen(["celery", "-A", djangoapp, "worker"])
+
+    print("Starting Django ...")
+    celery = subprocess.Popen(["python3", "./manage.py", "runserver"])
+
+    while True:
+        try:
+            c = sys.stdin.read(1)
+        except KeyboardInterrupt:
+            break
+
+    print("Stopping ...")
+    os.kill(celery.pid, signal.SIGTERM)
+    os.kill(django.pid, signal.SIGTERM)
+    os.kill(redis.pid, signal.SIGTERM)
+
+
+if __name__ == "__main__":
+    argp = argparse.ArgumentParser(description="Golm framework configuration utility")
+    argp.add_argument('command', nargs=1, type=str, help="One of : init, start, help")
+    argp.add_argument('djangoapp', nargs='?', help="Name of your django app.")
+
+    args = argp.parse_args()
+    command = args.command[0]
+
+    if command == 'init':
+        golm_init()
+    elif command == 'start':
+        if args.djangoapp is None:
+            argp.error("Django app name must be specified.")
+        djangoapp = args.djangoapp
+        golm_start(djangoapp)
+    elif command == 'help':
+        argp.print_help()
+        exit(0)
+    else:
+        print("Unknown command {}".format(command))
+        argp.print_usage()
+        exit(1)
