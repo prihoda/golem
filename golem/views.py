@@ -16,7 +16,8 @@ from django.views.decorators.csrf import csrf_exempt
 from golem.core.interfaces.facebook import FacebookInterface
 from golem.core.interfaces.microsoft import MicrosoftInterface
 from golem.core.interfaces.telegram import TelegramInterface
-from golem.core.persistence import get_elastic, get_redis
+from golem.core.persistence import get_redis
+from golem.core.logging.elastic import get_elastic
 from golem.core.tests import ConversationTest, ConversationTestRecorder, ConversationTestException, TestLog, \
     UserTextMessage
 
