@@ -22,10 +22,29 @@ What it can NOT do:
 - It does not pre-train Wit, you have to do that yourself
 - It's not built for AI conversational bots (you can try though :P)
 
-# Docs
+## Getting started
+
+Just install the package and run our `golm` init script that will take care of initial configuration.
+```bash
+pip3 install django-golem
+golm init my-bot
+cd my-bot && golm start my-bot
+```
+
+That's all! A development chat server should now be running at http://localhost:8000.
+
+
+You may also want to configure NLU, chat integrations and analytics, see the documentation for details.
+
+## Docs
 
 It's very easy to get started!
 
 Find out how to make your own bot on the **[Wiki](https://github.com/prihoda/golem/wiki)**.
 
-Made @ [FIT CTU](https://fit.cvut.cz/en) in Prague.
+## Authors
+- David Příhoda - [prihoda](https://github.com/prihoda)
+- Jakub Drdák   - [drdakjak](https://github.com/drdakjak)
+- Matúš Žilinec - [mzilinec](https://github.com/mzilinec)
+
+Made @ [Datalab](https://datalab.fit.cvut.cz) [FIT CTU](https://fit.cvut.cz/en) in Prague.
