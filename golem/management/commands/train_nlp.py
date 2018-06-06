@@ -10,7 +10,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         from golem.nlp import train
         if options.get('entity'):
-            if 'entity' == 'all':
+            if options['entity'][0] == 'all':
                 train.train_all()
             train.train_all(options['entity'])
         else:

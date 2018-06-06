@@ -6,13 +6,13 @@ import importlib
 import re
 from django.conf import settings
 
-from golem.core import message_logger
 from golem.core.chat_session import ChatSession
+from golem.core.responses import LinkButton
 from golem.core.responses.responses import TextMessage
 from golem.tasks import accept_inactivity_callback, accept_schedule_callback
 from .context import Context
 from .flow import Flow
-from .logger import Logger
+from .logger import MessageLogging
 from .persistence import get_redis
 from .serialize import json_deserialize, json_serialize
 from .tests import ConversationTestRecorder
@@ -24,7 +24,8 @@ class DialogManager:
     def __init__(self, session: ChatSession):
         self.session = session
         self.uid = session.chat_id  # for backwards compatibility
-        self.logger = Logger(session)
+        # self.logger = ElasticsearchLogger(session)
+        self.logger = MessageLogging(self)
         self.db = get_redis()
         self.log = logging.getLogger()
 
@@ -55,7 +56,7 @@ class DialogManager:
             counter = 0
             history = []
             self.init_flows()
-            self.logger.log_user(self.session.profile)
+            self.logger.log_user(self.session)
         self.context = Context(entities=entities, history=history, counter=counter, dialog=self)  # type: Context
 
     def init_flows(self):
@@ -321,6 +322,26 @@ class DialogManager:
             #self.log.info('Message: {}'.format(response))
             self.logger.log_bot_message(response, self.current_state_name)
 
-            text = response.text if hasattr(response, 'text') else (response if isinstance(response, str) else None)
-            if text and self.should_log_messages:
-                message_logger.on_message.delay(self.session, text, self, from_user=False)
+            # text = response.text if hasattr(response, 'text') else (response if isinstance(response, str) else None)
+            # if text and self.should_log_messages:
+            #     message_logger.on_message.delay(self.session, text, self, from_user=False)
+
+    def dont_understand(self):
+        # TODO log to chatbase
+        # TODO work in progress
+        from golem.core.parsing import golem_extractor
+        utterance = self.context.get("_message_text", max_age=0)
+        nlu = golem_extractor.GOLEM_NLU
+        if not nlu or not utterance:
+            print("NLU instance and message text can't be None")
+            return
+        intent = nlu.parse_entity(utterance, 'intent', threshold=0.5)
+        if intent:
+            text = "I'm not sure what you mean. Are you talking about \"{}\"?".format(intent[0]['value'])
+            message = TextMessage(text).with_replies(['Yes', 'No'])
+            self.send_response(message)
+        else:
+            text = "I'm not sure what you mean. Could you help me learn?"
+            message = TextMessage(text).add_button(LinkButton("WebView", "http://zilinec.me/intent.html"))
+            self.send_response(message)
+            # TODO webview

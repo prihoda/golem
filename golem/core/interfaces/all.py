@@ -19,8 +19,10 @@ def get_interfaces():
     from golem.core.interfaces.facebook import FacebookInterface
     from golem.core.interfaces.telegram import TelegramInterface
     from golem.core.interfaces.microsoft import MicrosoftInterface
+    from golem.core.interfaces.google import GoogleActionsInterface
     from golem.core.interfaces.test import TestInterface
-    return interfaces + [FacebookInterface, TelegramInterface, MicrosoftInterface, TestInterface]
+    return interfaces + [FacebookInterface, TelegramInterface, MicrosoftInterface, GoogleActionsInterface,
+                         TestInterface]
 
 
 def create_from_name(name):

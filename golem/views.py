@@ -16,7 +16,8 @@ from django.views.decorators.csrf import csrf_exempt
 from golem.core.interfaces.facebook import FacebookInterface
 from golem.core.interfaces.microsoft import MicrosoftInterface
 from golem.core.interfaces.telegram import TelegramInterface
-from golem.core.persistence import get_elastic, get_redis
+from golem.core.persistence import get_redis
+from golem.core.logging.elastic import get_elastic
 from golem.core.tests import ConversationTest, ConversationTestRecorder, ConversationTestException, TestLog, \
     UserTextMessage
 
@@ -70,11 +71,11 @@ class GActionsView(generic.View):
         return generic.View.dispatch(self, request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
-        from golem.core.interfaces.gactions import GActionsInterface
+        from golem.core.interfaces.google import GoogleActionsInterface
         body = json.loads(self.request.body.decode('utf-8'))
-        logging.critical(body)
-        GActionsInterface.accept_request(body)
-        return HttpResponse()
+        logging.info(body)
+        resp = GoogleActionsInterface.accept_request(body)
+        return JsonResponse(resp)
 
 
 class SkypeView(generic.View):
@@ -262,7 +263,7 @@ def log(request, user_limit):
         }
     })
 
-    user_map = {user['_source']['uid']: {'name' : user['_source']['profile']['first_name'] + ' ' + user['_source']['profile']['last_name'], 'id' : 'uid_'+user['_source']['uid']} for user in res['hits']['hits'] if user['_source']}
+    user_map = {user['_source']['uid']: {'name' : '{} {}'.format(user['_source']['profile'].get('first_name'), user['_source']['profile'].get('last_name')), 'id' : 'uid_'+user['_source']['uid']} for user in res['hits']['hits'] if user['_source']}
     users = [user_map[u['uid']] if u['uid'] in user_map else {'id':'uid_'+u['uid'], 'name':u['uid']} for u in uids]
 
     context = {

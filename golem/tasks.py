@@ -30,6 +30,7 @@ def accept_user_message(session: dict, raw_message):
     if should_log_messages and 'text' in raw_message:
         text = raw_message['text']
         message_logger.on_message.delay(session, text, dialog, from_user=True)
+    return True  # FIXME
 
 
 def setup_schedule_callbacks(sender, callback):
