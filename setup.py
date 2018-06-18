@@ -11,18 +11,19 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
     name='django-golem',
-    version='0.9-beta',
+    version='0.90-beta1',
     packages=find_packages(),
     include_package_data=True,
     license='Apache Software License',
-    description='Framework for creating chatbots on Django for Messenger and other platforms.',
+    description='Framework for creating stateful chatbots on Django.',
     long_description=README,
     url='https://github.com/prihoda/golem',
     author='David Příhoda, Jakub Drdák, Matúš Žilinec',
     author_email='david.prihoda@gmail.com',
     entry_points={
           'console_scripts': [
-              'golem-admin = golem.core.admin:main'
+              'golem-admin = golem.core.admin:main',
+              'golm = golem.management.golm:main'
           ]
       },
     classifiers=[
@@ -39,6 +40,6 @@ setup(
         'Topic :: Internet :: WWW/HTTP',
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
     ],
-    install_requires=['django', 'networkx','requests','six','sqlparse','wit','wheel','redis',
-    'pytz','unidecode','emoji','elasticsearch','celery','dateutil'],
+    install_requires=['django', 'networkx', 'requests', 'six', 'sqlparse', 'wit==4.3.0', 'wheel', 'redis',
+                      'pytz', 'unidecode', 'emoji', 'elasticsearch', 'celery', 'python-dateutil'],
 )

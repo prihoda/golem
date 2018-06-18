@@ -36,7 +36,7 @@ def install_skeleton(dest_dir):
         settings_content = f.read()
     # \n is converted by stdlib, keep calm
     settings_content = "from .golm_settings import *\n" + settings_content
-    apps_str = "\n    'golem',\n    'webgui',"  # FIXME golem-webgui
+    apps_str = "\n    'golem.apps.GolemConfig',"  # \n    'webgui',"  # FIXME golem-webgui
     idx = settings_content.find("INSTALLED_APPS")
     idx = settings_content.find("\n", idx)
     settings_content = settings_content[:idx] + apps_str + settings_content[idx:]
