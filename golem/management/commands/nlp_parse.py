@@ -8,7 +8,7 @@ class Command(BaseCommand):
         parser.add_argument('text', nargs=1, type=str)
 
     def handle(self, *args, **options):
-        from golem.nlp.predict import GolemNLU
+        from golem.nlu.predict import GolemNLU
         from pprint import pprint
         text = options['text'][0]
         if isinstance(text, str):

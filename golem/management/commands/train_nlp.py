@@ -8,7 +8,7 @@ class Command(BaseCommand):
         parser.add_argument('entity', nargs='+', type=str)
 
     def handle(self, *args, **options):
-        from golem.nlp import train
+        from golem.nlu import train
         if options.get('entity'):
             if options['entity'][0] == 'all':
                 train.train_all()
