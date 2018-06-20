@@ -68,12 +68,17 @@ class DialogManager:
 
     def create_flows(self):
         import yaml
-        flows = {}
+        flows = {}  # a dict with all the flows loaded from YAML
         BOTS = settings.GOLEM_CONFIG.get('BOTS', [])
         for filename in BOTS:
             try:
                 with open(os.path.join(settings.BASE_DIR, filename)) as f:
-                    flows.update(yaml.load(f))
+                    file_flows = yaml.load(f)
+                    for flow in file_flows:
+                        if flow in flows:
+                            raise Exception("Error: duplicate flow {}".format(flow))
+                        flows[flow] = file_flows[flow]
+                        flows[flow]['relpath'] = os.path.dirname(filename)  # directory of relative imports
             except OSError as e:
                 raise ValueError("Unable to open definition {}".format(filename)) from e
         return flows
@@ -109,6 +114,9 @@ class DialogManager:
 
         if self.test_record_message(message_type, entities):
             return
+        elif self.special_message(message_type, entities):
+            return
+
 
         if message_type != 'schedule':
             self.save_inactivity_callback()
@@ -120,7 +128,7 @@ class DialogManager:
                 # TODO somebody might want _message_text and intent locked for freetext/human
                 acceptable_entities = list(filter(lambda e: e.startswith("_"), entities.keys()))
                 # blame the dialog designer for bad postbacks ... but it's a good idea to prefix special entities with _
-                if message_type != 'message' or self.get_flow().accepts_message(acceptable_entities):
+                if message_type != 'message' or self.get_flow().accepts_message(acceptable_entities):  # FIXME this won't work
                     if self.get_state().is_temporary:
                         # execute default action TODO stay here, like fake root
                         self.move_by_entities(entities)
@@ -181,6 +189,19 @@ class DialogManager:
         if record == 'start':
             ConversationTestRecorder.record_user_message(message_type, entities)
             self.recording = True
+        return False
+
+    def special_message(self, type, entities):
+        text = entities.get("_message_text")
+        if not isinstance(text, str):
+            return False
+        elif text == '/areyougolem':
+            self.send_response("Golem Framework Dialog Manager v{}".format(self.version))
+            return True
+        elif text.startswith('/intent/'):
+            intent = text.replace('/intent/', '', count=1)
+            self.context.set_value("intent", intent)
+            return True
         return False
 
     def run_accept(self, save_identical=False):

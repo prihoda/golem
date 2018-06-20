@@ -1,3 +1,5 @@
+from typing import Optional
+
 import importlib
 import re
 
@@ -91,20 +93,24 @@ class NewState:
         self.is_temporary = is_temporary
 
     @staticmethod
-    def load(definition: dict) -> tuple:
+    def load(definition: dict, relpath: Optional[str]) -> tuple:
         name = definition['name']
         action = None
         if 'action' in definition:
             action = definition['action']
-            action = NewState.make_action(action)
-        requires = NewState.parse_requirements(definition.get('require'))
+            action = NewState.make_action(action, relpath)
+        requires = NewState.parse_requirements(definition.get('require'), relpath)
         intent = definition.get("intent")
         is_temporary = definition.get("temporary")
         s = NewState(name=name, action=action, intent=intent, requires=requires, is_temporary=is_temporary)
         return name, s
 
     @staticmethod
-    def make_action(action, base=None):  # TODO support relative paths, discovery or what
+    def make_action(action, relpath: Optional[str] = None):
+
+        if isinstance(relpath, str):
+            relpath = relpath.replace("/", ".")
+
         if callable(action):
             # action already given as object, everything ok
             return action
@@ -113,9 +119,8 @@ class NewState:
 
             try:
                 rel_module, fn_name = action.rsplit(".", maxsplit=1)
-                # TODO support relative imports in YAML
                 try:
-                    abs_module = base + "." + rel_module
+                    abs_module = relpath + "." + rel_module
                     module = importlib.import_module(abs_module)
                 except:
                     module = importlib.import_module(rel_module)
@@ -156,7 +161,7 @@ class NewState:
         return dynamic_response_fn(message, next)
 
     @staticmethod
-    def parse_requirements(reqs_raw):
+    def parse_requirements(reqs_raw, relpath: Optional[str]):
         reqs = []
         if reqs_raw is None:
             return reqs
@@ -166,7 +171,7 @@ class NewState:
                 slot=req.get("slot"),
                 entity=req.get("entity"),
                 filter=req.get("filter"),
-                action=NewState.make_action(req.get("action"))
+                action=NewState.make_action(req.get("action"), relpath)
             ))
 
         return reqs
@@ -209,7 +214,8 @@ class NewFlow:
 
     @staticmethod
     def load(name, data: dict):
-        states = dict(NewState.load(s) for s in data["states"])
+        relpath = data.get("relpath")  # directory of relative imports
+        states = dict(NewState.load(s, relpath) for s in data["states"])
         intent = data.get("intent", name)
         flow = NewFlow(name=name, states=states, intent=intent)
         flow.accepted = set(data.get('accepts', {}))
