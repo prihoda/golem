@@ -1,16 +1,12 @@
 import json
 import logging
-import time
-from base64 import b64encode, b64decode
 
 import random
 
 from golem.core.chat_session import ChatSession
 from golem.core.message_parser import parse_text_message
-from golem.core.responses.buttons import PayloadButton
-from golem.core.responses.quick_reply import LocationQuickReply
 from golem.tasks import accept_user_message
-from .models import Message, Button, Element
+from .models import WebMessageData
 
 
 class WebGuiInterface:
@@ -32,54 +28,11 @@ class WebGuiInterface:
     def post_message(session, response):
         uid = session.meta.get("uid")
         WebGuiInterface.messages.append(response)
-        message = Message()
+        message = WebMessageData()
         message.uid = uid
-        message.timestamp = time.time()
         message.is_response = True
-        try:
-            message.text = response.text
-        except AttributeError:
-            pass
+        message.data = json.dumps(response.to_response())
         message.save()
-        if hasattr(response, 'buttons'):
-            for btn in response.buttons:
-                b = Button()
-                b.message_id = message.id
-                b.text = btn.title
-                if hasattr(btn, 'url'):
-                    b.action = 'link'
-                    b.url = btn.url
-                elif isinstance(btn, PayloadButton):
-                    b.action = "postback"
-                    b.url = b64encode(str.encode(json.dumps(btn.payload)))
-                # todo parse stuff
-                b.save()
-
-        try:
-            for q in response.quick_replies:
-                b = Button()
-                b.message_id = message.id
-                if isinstance(q, LocationQuickReply):
-                    b.text = 'My location\n(unsupported in web gui)'
-                    b.action = 'null'  # TODO support sending location
-                else:
-                    b.text = q.title
-                    b.action = 'reply'
-                b.save()
-        except AttributeError:
-            pass
-        try:
-            for element in response.elements:
-                e = Element()
-                e.message_id = message.id
-                e.title = element.title
-                e.image_url = element.image_url
-                e.subtitle = element.subtitle
-                e.save()
-                # todo buttons in elements etc.
-                # todo quick replies
-        except AttributeError:
-            pass
 
     @staticmethod
     def send_settings(settings):
@@ -104,7 +57,9 @@ class WebGuiInterface:
         if user_message.get('text'):
             return parse_text_message(user_message.get('text'))
         elif user_message.get("payload"):
-            data = json.loads(b64decode(user_message["payload"]).decode())
+            # data = json.loads(user_message["payload"])
+            data = user_message['payload']
+            # data = json.loads(b64decode(user_message["payload"]).decode())
             logging.info("Payload is: {}".format(data))
             if isinstance(data, dict):
                 return {'entities': data, 'type': 'postback'}
@@ -115,34 +70,37 @@ class WebGuiInterface:
                 return {'entities': payload, 'type': 'postback'}
 
     @staticmethod
-    def accept_request(msg: Message):
+    def accept_request(msg: WebMessageData):
         uid = str(msg.uid)
+
         logging.info('[WEBGUI] Received message from {}'.format(uid))
         session = ChatSession(WebGuiInterface, uid, meta={"uid": uid})
-        accept_user_message.delay(session.to_json(), {"text": msg.text})
+        accept_user_message.delay(session.to_json(), {"text": msg.message().get('text')})
 
     @staticmethod
-    def accept_postback(msg: Message, data):
+    def accept_postback(msg: WebMessageData, data):
         uid = str(msg.uid)
+        data = json.loads(data)
+
         logging.info('[WEBGUI] Received postback from {}'.format(uid))
         session = ChatSession(WebGuiInterface, uid, meta={"uid": uid})
-        accept_user_message.delay(session.to_json(), {"payload": data})
+        accept_user_message.delay(session.to_json(), {"_message_text": msg.message().get('text'), "payload": data})
 
     @staticmethod
     def make_uid(username) -> str:
         uid = None
         tries = 0
-        while (not uid or len(Message.objects.filter(uid__exact=uid)) != 0) or tries < 100:
+        while (not uid or len(WebMessageData.objects.filter(uid__exact=uid)) != 0) or tries < 100:
             uid = '_'.join([str(username), str(random.randint(1000, 99999))])
             tries += 1
         # delete messages for old session with this uid, if there was one
         # FIXME invalidate the previous user's session!
         try:
-            Message.objects.get(uid__exact=uid).delete()
+            WebMessageData.objects.get(uid__exact=uid).delete()
         except Exception:
             pass  # first user, there is no such table yet
         return uid
 
     @staticmethod
     def destroy_uid(uid):
-        Message.objects.filter(uid__exact=uid).delete()
+        WebMessageData.objects.filter(uid__exact=uid).delete()

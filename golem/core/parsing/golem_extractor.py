@@ -9,7 +9,7 @@ class GolemExtractor(EntityExtractor):
 
     def extract_entities(self, text: str, max_retries=1):
         if not self.nlu:
-            from golem.nlp.predict import GolemNLU
+            from golem.nlu.predict import GolemNLU
             self.nlu = GolemNLU()
             global GOLEM_NLU
             GOLEM_NLU = self.nlu
