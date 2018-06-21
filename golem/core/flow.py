@@ -75,7 +75,7 @@ def require_one_of(entities=[]):
 
 
 class NewState:
-    def __init__(self, name: str, action, intent=None, requires=None, is_temporary=False):
+    def __init__(self, name: str, action, intent=None, requires=None, is_temporary=False, is_blocking=False, supported: set=None):
         """
         Construct a conversation state.
         :param name:            name of this state
@@ -85,15 +85,25 @@ class NewState:
         :param is_temporary     whether the action should fire just once,
                                  after that, the state will be used just as a basis for transitions
                                  and unrecognized messages will move to default.root instead.
+        :param is_blocking      disallows all state changes caused by entities
+        :param supported        entities that will not trigger a state change (- state can handle them)
         """
         self.name = str(name)
         self.action = action
         self.intent = intent
         self.requires = requires
         self.is_temporary = is_temporary
+        self.is_blocking = is_blocking
+        self.supported = supported or set()
 
     @staticmethod
     def load(definition: dict, relpath: Optional[str]) -> tuple:
+        """
+        Loads state from a dictionary definition.
+        :param definition:      a dict containing the state definition (e.g. from YAML)
+        :param relpath:         base path for relative action imports
+        :return: tuple (state_name, state)
+        """
         name = definition['name']
         action = None
         if 'action' in definition:
@@ -101,12 +111,28 @@ class NewState:
             action = NewState.make_action(action, relpath)
         requires = NewState.parse_requirements(definition.get('require'), relpath)
         intent = definition.get("intent")
-        is_temporary = definition.get("temporary")
-        s = NewState(name=name, action=action, intent=intent, requires=requires, is_temporary=is_temporary)
+        is_temporary = definition.get("temporary", False)
+        is_blocking = definition.get("block", False)
+        supported = set(definition.get("supports", [])).union([r.entity for r in requires])  # TODO add local entities
+        s = NewState(
+            name=name,
+            action=action,
+            intent=intent,
+            requires=requires,
+            is_temporary=is_temporary,
+            is_blocking=is_blocking,
+            supported=supported
+        )
         return name, s
 
     @staticmethod
     def make_action(action, relpath: Optional[str] = None):
+        """
+        Loads action from a definition.
+        :param action:      either a string or a function pointer
+        :param relpath:     base path for relative imports
+        :return:    The loaded action, a function pointer.
+        """
 
         if isinstance(relpath, str):
             relpath = relpath.replace("/", ".")
@@ -137,6 +163,11 @@ class NewState:
 
     @staticmethod
     def make_default_action(action_dict):
+        """
+        Creates an action from a non-function definition.
+        :param action_dict:
+        :return: The created action, a function pointer.
+        """
         from golem.core.responses import TextMessage
         next = action_dict.get("next")
         message = None
@@ -194,6 +225,9 @@ class NewState:
             if not requirement.matches(context):
                 return requirement
         return True
+
+    def is_supported(self, msg_entities: list) -> bool:
+        return self.is_blocking or not self.supported.isdisjoint(msg_entities)
 
     def __str__(self):
         return "state:" + self.name

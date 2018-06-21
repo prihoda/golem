@@ -18,7 +18,7 @@ from .tests import ConversationTestRecorder
 
 
 class DialogManager:
-    version = '1.33'
+    version = '1.34'
 
     def __init__(self, session: ChatSession):
         self.session = session
@@ -123,23 +123,30 @@ class DialogManager:
 
         self.log.info('++ PROCESSING ++++++++++++++++++++++++++++++++++++')
 
-        if not self.check_state_transition():
-            if not self.check_intent_transition():
-                # TODO somebody might want _message_text and intent locked for freetext/human
-                acceptable_entities = list(filter(lambda e: e.startswith("_"), entities.keys()))
+        if not self.check_state_transition() \
+            and not self.check_intent_transition(entities) \
+            and not self.check_entity_transition(entities):
+                self.run_accept(save_identical=True)
+                self.save_state()
+
+                # FIXME remove this or integrate with check_entity_transition and new "unsupported" states
+                # TODO should "unsupported" be states or just actions?
+
+                # _TODO somebody might want _message_text and intent locked for freetext/human
+                # acceptable_entities = list(filter(lambda e: e.startswith("_"), entities.keys()))
                 # blame the dialog designer for bad postbacks ... but it's a good idea to prefix special entities with _
-                if message_type != 'message' or self.get_flow().accepts_message(acceptable_entities):  # FIXME this won't work
-                    if self.get_state().is_temporary:
-                        # execute default action TODO stay here, like fake root
-                        self.move_by_entities(entities)
-                        self.save_state()
-                    else:
-                        self.run_accept(save_identical=True)
-                        self.save_state()
-                else:
-                    self.log.debug("Unsupported entity, moving to default.root")
-                    self.move_by_entities(entities)
-                    self.save_state()
+                #if message_type != 'message' or self.get_flow().accepts_message(acceptable_entities):  # _FIXME this won't work
+                #    if self.get_state().is_temporary:
+                #        # execute default action _TODO stay here, like fake root
+                #        self.move_by_entities(entities)
+                #        self.save_state()
+                #    else:
+                #        self.run_accept(save_identical=True)
+                #        self.save_state()
+                #else:
+                #    self.log.debug("Unsupported entity, moving to default.root")
+                #    self.move_by_entities(entities)
+                #    self.save_state()
 
         self.session.interface.processing_end(self.session)
 
@@ -231,10 +238,15 @@ class DialogManager:
         new_state_name = self.context._state.current_v()  #get('_state', max_age=0)
         return self.move_to(new_state_name)
 
-    def check_intent_transition(self):
+    def check_intent_transition(self, entities: dict):
+
         intent = self.context.intent.current_v()
         if not intent:
             return False
+
+        if self.get_state().is_supported(entities.keys()):
+            return False
+
         # FIXME Get custom intent transition
         new_state_name = None # self.get_state().get_intent_transition(intent)
         # If no custom intent transition present, move to the flow whose 'intent' field matches intent
@@ -258,6 +270,14 @@ class DialogManager:
         self.log.info('Moving based on intent %s...' % intent)
         return self.move_to(new_state_name + ":")  # : runs the action
 
+    def check_entity_transition(self, entities: dict):
+        # TODO first check if supported, if yes, abort
+        # TODO then check if there is a flow that would accept the entity, if not ...
+        # AND THEN? a) default.root don't understand b) remain in the same state
+        # I'd say don't understand but still keep tuned for the entity in default.root (temporary root)
+        # Even better: move to special (configurable) unsupported state that will be temporary too
+        return False
+
     def get_flow(self, flow_name=None):
         if not flow_name:
             flow_name, _ = self.current_state_name.split('.', 1)
@@ -269,6 +289,9 @@ class DialogManager:
         return flow.get_state(state_name) if flow else None
 
     def move_to(self, new_state_name, initializing=False, save_identical=False):
+
+        # TODO just run action without moving if the state is temporary
+
         # if flow prefix is not present, add the current one
         if isinstance(new_state_name, int):
             new_state = self.context.get_history_state(new_state_name - 1)
