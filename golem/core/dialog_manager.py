@@ -343,12 +343,11 @@ class DialogManager:
         identical = new_state_name == self.current_state_name
         if not initializing and (not identical or save_identical):
             self.context.add_state(new_state_name)
-        if not new_state_name or identical:
+        if not new_state_name:
             return False
         previous_state = self.current_state_name
         self.current_state_name = new_state_name
         if not initializing:
-            self.log.info('MOVING %s -> %s %s' % (previous_state, new_state_name, action))
 
             # notify the interface that the state was changed
             self.session.interface.state_change(self.current_state_name)
@@ -362,6 +361,13 @@ class DialogManager:
                         previous_state, new_state_name
                     ))
                     self.run_accept()
+                elif action:
+                    logging.info("Staying in state {} and executing action".format(previous_state))
+                    self.run_accept()
+                elif previous_state != new_state_name:
+                    logging.info("Moving from {} to {} and doing nothing".format(previous_state, new_state_name))
+                else:
+                    logging.info("Staying in state {} and doing nothing".format(previous_state))
 
             except Exception as e:
                 logging.error('*****************************************************')
