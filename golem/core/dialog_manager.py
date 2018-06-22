@@ -127,7 +127,7 @@ class DialogManager:
             and not self.check_intent_transition(entities) \
             and not self.check_entity_transition(entities):
 
-                if self.get_state().is_blocking:
+                if self.get_state().is_supported(entities.keys()):
                     self.run_accept(save_identical=True)
                     self.save_state()
                 else:
@@ -242,7 +242,9 @@ class DialogManager:
 
     def check_state_transition(self):
         new_state_name = self.context._state.current_v()  #get('_state', max_age=0)
-        return self.move_to(new_state_name)
+        if new_state_name is not None:
+            return self.move_to(new_state_name)
+        return False
 
     def check_intent_transition(self, entities: dict):
 
@@ -314,6 +316,8 @@ class DialogManager:
         return flow.get_state(state_name) if flow else None
 
     def move_to(self, new_state_name, initializing=False, save_identical=False):
+
+        logging.info("Trying to move to {}".format(new_state_name))
 
         # TODO just run action without moving if the state is temporary
 
