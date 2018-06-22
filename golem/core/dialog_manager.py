@@ -126,8 +126,14 @@ class DialogManager:
         if not self.check_state_transition() \
             and not self.check_intent_transition(entities) \
             and not self.check_entity_transition(entities):
-                self.run_accept(save_identical=True)
-                self.save_state()
+
+                if self.get_state().is_blocking:
+                    self.run_accept(save_identical=True)
+                    self.save_state()
+                else:
+                    # TODO run 'unsupported' action but stay here
+                    self.move_to("default.root:")
+                    self.save_state()
 
                 # FIXME remove this or integrate with check_entity_transition and new "unsupported" states
                 # TODO should "unsupported" be states or just actions?
@@ -250,7 +256,9 @@ class DialogManager:
         # FIXME Get custom intent transition
         new_state_name = None # self.get_state().get_intent_transition(intent)
         # If no custom intent transition present, move to the flow whose 'intent' field matches intent
+
         # Check accepted intent of the current flow's states
+        # TODO document this feature or remove it
         if not new_state_name:
             flow = self.get_flow()
             new_state_name = flow.get_state_for_intent(intent)
@@ -271,11 +279,28 @@ class DialogManager:
         return self.move_to(new_state_name + ":")  # : runs the action
 
     def check_entity_transition(self, entities: dict):
-        # TODO first check if supported, if yes, abort
-        # TODO then check if there is a flow that would accept the entity, if not ...
+
+        # first check if supported, if yes, abort
+        if self.get_state().is_supported(entities.keys()):
+            return False
+
+        # TODO check states of current flow for 'accepted' first
+
+        new_state_name = None
+
+        # then check if there is a flow that would accept the entity
+        for flow in self.flows.values():
+            if flow.acceppts_message(entities.keys()):
+                new_state_name = flow.name + '.root'  # TODO might use a state that accepts it instead?
+                break
+
+        if new_state_name:
+            return self.move_to(new_state_name + ":")
+
         # AND THEN? a) default.root don't understand b) remain in the same state
         # I'd say don't understand but still keep tuned for the entity in default.root (temporary root)
         # Even better: move to special (configurable) unsupported state that will be temporary too
+
         return False
 
     def get_flow(self, flow_name=None):
