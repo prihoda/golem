@@ -292,11 +292,12 @@ class DialogManager:
 
         # then check if there is a flow that would accept the entity
         for flow in self.flows.values():
-            if flow.acceppts_message(entities.keys()):
+            if flow.accepts_message(entities.keys()):
                 new_state_name = flow.name + '.root'  # TODO might use a state that accepts it instead?
                 break
 
         if new_state_name:
+            logging.info("Moving by entity")
             return self.move_to(new_state_name + ":")
 
         # AND THEN? a) default.root don't understand b) remain in the same state

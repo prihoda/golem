@@ -285,8 +285,11 @@ class NewFlow:
         return self
 
     def accepts_message(self, entities: list) -> bool:
-        """Checks whether this flow accepts a message with given entities."""
-        return len(self.accepted.union(entities)) > 0  # TODO or current state accepts it
+        """
+        Checks whether this flow accepts a message with given entities.
+        Used for entity transitions.
+        """
+        return not self.accepted.isdisjoint(entities)
 
     def __str__(self):
         return "flow:" + self.name
