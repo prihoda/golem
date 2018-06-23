@@ -8,7 +8,7 @@
 
 #### Golem is a python framework for building chatbots for Messenger, Telegram and other platforms.
 
-**Golem differs from other bot frameworks by giving a concrete structure to the conversation.**
+It differs from other bot frameworks by giving a concrete structure to the conversation.
 
 What it can do:
 - __Receive messages__ from __Messenger__ and __Telegram__ (Actions on Google coming soon)
