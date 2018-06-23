@@ -180,7 +180,10 @@ class DialogManager:
         return False
 
     def special_message(self, type, entities):
-        text = entities.get("_message_text")
+        text = entities.get("_message_text", [])
+        text = text[0] if len(text) else None
+        text = text.get("value") if text else None
+
         if not isinstance(text, str):
             return False
         elif text == '/areyougolem':
