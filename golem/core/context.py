@@ -1,11 +1,10 @@
+import logging
 import time
 from typing import Union
 
+from collections import Iterable
 from functools import reduce
 
-from collections import Iterable
-
-from golem.core.entities import Entity
 from golem.core.entity_query import EntityQuery
 from golem.core.entity_value import EntityValue
 
@@ -29,7 +28,7 @@ class Context(object):
         if key in ['counter', 'entities', 'history', 'max_depth', 'dialog', 'history_restart_minutes']:
             return super().__setattr__(key, value)
         if not isinstance(value, EntityValue):
-            raise ValueError("Entity must be an instance of EntityValue")
+            value = EntityValue(self, key, value=value)
         self.entities.setdefault(key, []).insert(0, value)
 
     def __contains__(self, key: Union[str, Iterable]):
@@ -128,7 +127,7 @@ class Context(object):
                 break
             v = entity_obj.value
             if v in ignored_values:
-                self.dialog.log.info('Skipping ignored entity value: {} == {}'.format(entity, v))
+                logging.info('Skipping ignored entity value: {} == {}'.format(entity, v))
                 continue
 
             values.append(entity)
@@ -138,13 +137,13 @@ class Context(object):
         return values
     
     def debug(self, max_age=5):
-        self.dialog.log.info('-- HEAD of Context (max age {}): --'.format(max_age))
+        logging.info('-- HEAD of Context (max age {}): --'.format(max_age))
         for entity in self.entities:
             entities = self.get_all_first(entity, max_age=max_age)
             if entities:
                 vs = [entity.value for entity in entities]
-                self.dialog.log.info('{} (age {}): {}'.format(entity, self.counter - entities[0].counter, vs if len(vs) > 1 else vs[0]))
-        self.dialog.log.info('----------------------------------')
+                logging.info('{} (age {}): {}'.format(entity, self.counter - entities[0].counter, vs if len(vs) > 1 else vs[0]))
+        logging.info('----------------------------------')
 
     def get(self, entity, max_age=None, ignored_values=tuple()) -> EntityValue or None:
         values = self.get_all(entity, max_age=max_age, limit=1, ignored_values=ignored_values)
