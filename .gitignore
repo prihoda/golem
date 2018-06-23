@@ -71,3 +71,6 @@ celerybeat-schedule
 # Golem files
 manage.py
 dist/
+build/
+.pyre/
+dump.rdb
