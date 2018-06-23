@@ -103,6 +103,8 @@ class DialogManager:
         self.context.counter += 1
 
         entities = self.context.add_entities(entities)
+        # remove keys with empty values
+        entities = {k: v for k, v in entities.items() if len(v) > 0}
 
         if self.test_record_message(message_type, entities):
             return
@@ -262,7 +264,7 @@ class DialogManager:
 
     def check_entity_transition(self, entities: dict):
         """ Checks if entity was parsed from current message (and moves if associated state exists)"""
-
+        # FIXME somehow it also uses older entities
         # first check if supported, if yes, abort
         if self.get_state().is_supported(entities.keys()):
             return False
@@ -274,6 +276,7 @@ class DialogManager:
         # then check if there is a flow that would accept the entity
         for flow in self.flows.values():
             if flow.accepts_message(entities.keys()):
+                logging.error(entities)
                 new_state_name = flow.name + '.root'  # TODO might use a state that accepts it instead?
                 break
 
