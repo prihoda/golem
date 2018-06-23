@@ -33,7 +33,7 @@ class FacebookInterface():
                 diff = crr_datetime - ts_datetime
                 if diff.total_seconds() < settings.GOLEM_CONFIG.get('MSG_LIMIT_SECONDS', 15):
                     # get and persist user and page ids
-                    print('INCOMING RAW FB MESSAGE: {}'.format(raw_message))
+                    logging.debug('Incoming raw FB message: {}'.format(raw_message))
                     user_id = raw_message['sender']['id']
                     page_id = entry['id']
                     chat_id = FacebookInterface.create_chat_id(page_id, user_id)
@@ -45,8 +45,7 @@ class FacebookInterface():
                     # Add it to the message queue
                     accept_user_message.delay(session.to_json(), raw_message)
                 elif raw_message.get('timestamp'):
-                    print("Delay {} too big, ignoring message!".format(diff))
-                    print(raw_message)
+                    logging.warning("Delay {} too big, ignoring message!".format(diff))
 
     @staticmethod
     def chat_id_to_page_id(chat_id):
@@ -74,7 +73,7 @@ class FacebookInterface():
         key = 'fb_profile_' + user_id
 
         if not cache or not db.exists(key):
-            print('Loading fb profile...')
+            logging.debug('Loading fb profile...')
 
             url = "https://graph.facebook.com/v2.6/" + user_id
             params = {
@@ -83,8 +82,7 @@ class FacebookInterface():
             }
             res = requests.get(url, params=params)
             if not res.status_code == requests.codes.ok:
-                print("!!!!!!!!!!!!!!!!!!!!!!! ERROR load_profile:")
-                print(res)
+                logging.error("ERROR loading FB profile! Response: {}".format(res.text))
                 return {}
 
             db.set(key, json.dumps(res.json()), ex=3600 * 24 * 14)  # save value, expire in 14 days
@@ -132,7 +130,7 @@ class FacebookInterface():
         if isinstance(response, ThreadSetting):
             request_mode = "thread_settings"
             response_dict = FacebookInterface.to_setting(response)
-            print('SENDING SETTING:', response_dict)
+            logging.debug('Sending FB setting: {}'.format(response_dict))
             FacebookInterface._do_post(request_mode, response_dict, page_id)
         else:
             raise ValueError('Error: Invalid message type: {}: {}'.format(type(response), response))

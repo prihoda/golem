@@ -276,7 +276,6 @@ class DialogManager:
         # then check if there is a flow that would accept the entity
         for flow in self.flows.values():
             if flow.accepts_message(entities.keys()):
-                logging.error(entities)
                 new_state_name = flow.name + '.root'  # TODO might use a state that accepts it instead?
                 break
 

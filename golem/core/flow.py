@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 import importlib
@@ -65,7 +66,7 @@ def require_one_of(entities=[]):
         def func_wrapper(state):
             all_entities = entities + ['intent', '_state']
             if not state.dialog.context.has_any(all_entities, max_age=0):
-                print('No required entities present, moving to default.root: {}'.format(all_entities))
+                logging.debug('No required entities present, moving to default.root: {}'.format(all_entities))
                 return None, 'default.root:accept'
             return func(state)
 
