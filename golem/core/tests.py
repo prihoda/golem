@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 import random
 
@@ -206,7 +207,7 @@ class ConversationTestRecorder:
 
     @staticmethod
     def record_user_message(message_type, message):
-        print('Recording user {}: {}'.format(message_type, message))
+        logging.warning('Recording user {}: {}'.format(message_type, message))
         db = get_redis()
         db.lpush('test_actions', json.dumps({'type':'user', 'body':{'type':message_type,'entities':message}}, default=json_serialize))
 
@@ -215,29 +216,33 @@ class ConversationTestRecorder:
         record = {'type':type(message).__name__}
         if isinstance(message, TextMessage):
             record['text'] = message.text
-        print('Recording bot message: {}'.format(record))
+        logging.warning('Recording bot message: {}'.format(record))
         db = get_redis()
         db.lpush('test_actions', json.dumps({'type':'bot', 'body':record}))
 
     @staticmethod
     def record_state_change(state):
-        print('Recording state change: {}'.format(state))
+        logging.warning('Recording state change: {}'.format(state))
         db = get_redis()
         db.lpush('test_actions', json.dumps({'type':'state', 'body':state}))
 
     @staticmethod
     def record_start():
-        print('Starting recording')
+        logging.warning('Starting recording')
         db = get_redis()
         db.delete('test_actions')
-        return TextMessage("Starting recording ;)", buttons=[{'title':'Stop recording', 'payload':{'test_record':'stop'}}])
+        message = TextMessage(text="Starting to record ;)")\
+            .add_button(PayloadButton(title="Stop recording", payload={"test_record": "stop"}))
+        return message
 
     @staticmethod
     def record_stop():
-        print('Stopping recording')
-        responses = []
-        responses.append(TextMessage("Done recording ;)", buttons=[{'title':'Get result', 'url':settings.GOLEM_CONFIG.get('DEPLOY_URL')+'/golem/test_record'}, {'title':'Start again', 'payload':{'test_record':'start'}}]))
-        return responses
+        logging.warning('Stopping recording')
+        deploy_url = settings.GOLEM_CONFIG.get('DEPLOY_URL', "localhost:8000")
+        message = TextMessage("Done recording ;)")\
+            .add_button(LinkButton(title='Get result', url=deploy_url + '/golem/test_record'))\
+            .add_button(PayloadButton(title='Start again', payload={"test_record": "start"}))
+        return [message]
 
     @staticmethod
     def get_result():

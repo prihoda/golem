@@ -104,7 +104,7 @@ class DialogManager:
 
         entities = self.context.add_entities(entities)
         # remove keys with empty values
-        entities = {k: v for k, v in entities.items() if len(v) > 0}
+        entities = {k: v for k, v in entities.items() if v is not None}
 
         if self.test_record_message(message_type, entities):
             return

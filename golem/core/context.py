@@ -130,7 +130,7 @@ class Context(object):
                 logging.info('Skipping ignored entity value: {} == {}'.format(entity, v))
                 continue
 
-            values.append(entity)
+            values.append(entity_obj)
             # if I already have enough values, stop looking
             if limit is not None and len(values) >= limit:
                 break
