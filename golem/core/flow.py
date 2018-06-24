@@ -1,4 +1,5 @@
 import logging
+from abc import abstractmethod, ABC
 from typing import Optional
 
 import importlib
@@ -114,7 +115,7 @@ class NewState:
         intent = definition.get("intent")
         is_temporary = definition.get("temporary", False)
         is_blocking = definition.get("block", False)
-        supported = set(definition.get("supports", [])).union([r.entity for r in requires])  # TODO add local entities
+        supported = set(definition.get("supports", [])).union([r.entity for r in requires if isinstance(r, EntityRequirement)])  # TODO add local entities
         s = NewState(
             name=name,
             action=action,
@@ -199,18 +200,31 @@ class NewState:
             return reqs
 
         for req in reqs_raw:
-            reqs.append(Requirement(
-                slot=req.get("slot"),
-                entity=req.get("entity"),
-                filter=req.get("filter"),
-                action=NewState.make_action(req.get("action"), relpath)
-            ))
+            req_cond = req.get("condition")
+            entity = req.get("entity")
+
+            if req_cond and entity:
+                raise ValueError("Error: either use a requirement entity or a condition, not both")
+            elif req_cond:
+                req_cond = NewState.make_action(req_cond, relpath)
+                action = NewState.make_action(req.get("action"), relpath)
+                reqs.append(ConditionRequirement(
+                    condition=req_cond,
+                    action=action
+                ))
+            elif entity:
+                reqs.append(EntityRequirement(
+                    slot=req.get("slot"),
+                    entity=req.get("entity"),
+                    filter=req.get("filter"),
+                    action=NewState.make_action(req.get("action"), relpath)
+                ))
 
         return reqs
 
     def set_requires(self, **kwargs):
         """Add required entities to this state. Useful to check for e.g. user's location."""
-        self.requires.append(Requirement(**kwargs))
+        self.requires.append(EntityRequirement(**kwargs))
         return self
 
     def check_requirements(self, context) -> bool:
@@ -296,7 +310,13 @@ class NewFlow:
         return "flow:" + self.name
 
 
-class Requirement():
+class Requirement(ABC):
+    @abstractmethod
+    def matches(self, context) -> bool:
+        pass
+
+
+class EntityRequirement(Requirement):
     def __init__(self, slot, entity, filter=None, message=None, action=None):
         self.slot = slot
         self.entity = entity
@@ -314,6 +334,19 @@ class Requirement():
             eq = EntityQuery.from_yaml(context, self.entity, self.filter)
             return eq.count() > 0
         return True
+
+
+class ConditionRequirement(Requirement):
+    def __init__(self, condition, message=None, action=None):
+        self.condition = condition
+        self.action = action or dynamic_response_fn(message)
+        if not self.condition:
+            raise ValueError("Requirement has no condition set")
+        if not self.action:
+            raise ValueError("Requirement has no message nor action")
+
+    def matches(self, context) -> bool:
+        return self.condition(context)
 
 
 def load_flows_from_definitions(data: dict):
