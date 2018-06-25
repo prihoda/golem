@@ -1,27 +1,16 @@
 import logging
 
-interfaces = []
-
-
-def register_chat_interface(interface):
-    """
-    Registers a chat interface.
-    :param interface: Class of the interface to register.
-                      See golem.core.interfaces for reference.
-    """
-    interfaces.append(interface)
-
-
 def get_interfaces():
     """
     :returns: List of all registered chat interface classes.
     """
+    from webgui.interface import WebGuiInterface
     from golem.core.interfaces.facebook import FacebookInterface
     from golem.core.interfaces.telegram import TelegramInterface
     from golem.core.interfaces.microsoft import MicrosoftInterface
     from golem.core.interfaces.google import GoogleActionsInterface
     from golem.core.interfaces.test import TestInterface
-    return interfaces + [FacebookInterface, TelegramInterface, MicrosoftInterface, GoogleActionsInterface,
+    return [WebGuiInterface, FacebookInterface, TelegramInterface, MicrosoftInterface, GoogleActionsInterface,
                          TestInterface]
 
 
