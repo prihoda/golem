@@ -205,8 +205,6 @@ class DialogManager:
         """Runs action of the current state."""
         state = self.get_state()
         if self.current_state_name != 'default.root' and not state.check_requirements(self.context):
-            # TODO should they be checked when moving or always?
-            # TODO i would go with always as the user's code might depend on the entities being non-null
             requirement = state.get_first_requirement(self.context)
             self.run_action(requirement.action)
         else:
@@ -242,15 +240,11 @@ class DialogManager:
         if self.get_state().is_supported(entities.keys()):
             return False
 
-        # FIXME Get custom intent transition
-        new_state_name = None # self.get_state().get_intent_transition(intent)
-        # If no custom intent transition present, move to the flow whose 'intent' field matches intent
+        # move to the flow whose 'intent' field matches intent
 
         # Check accepted intent of the current flow's states
-        # TODO document this feature or remove it
-        if not new_state_name:
-            flow = self.get_flow()
-            new_state_name = flow.get_state_for_intent(intent)
+        flow = self.get_flow()
+        new_state_name = flow.get_state_for_intent(intent)
 
         # Check accepted intent of all flows
         if not new_state_name:
@@ -263,7 +257,6 @@ class DialogManager:
             logging.error('Error! Found intent "%s" but no flow present for it!' % intent)
             return False
 
-        # new_state_name = new_state_name + ':accept'
         logging.info('Moving based on intent %s...' % intent)
         return self.move_to(new_state_name + ":")  # : runs the action
 
@@ -308,8 +301,6 @@ class DialogManager:
     def move_to(self, new_state_name, initializing=False, save_identical=False):
         """Moves to a state by its full name."""
         logging.info("Trying to move to {}".format(new_state_name))
-
-        # TODO just run action without moving if the state is temporary
 
         # if flow prefix is not present, add the current one
         if isinstance(new_state_name, int):
