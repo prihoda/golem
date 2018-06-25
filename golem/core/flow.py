@@ -1,9 +1,9 @@
 import logging
-from abc import abstractmethod, ABC
 from typing import Optional
 
 import importlib
 import re
+from abc import abstractmethod, ABC
 
 from golem.core.responses import AttachmentMessage
 from .templates import Templates
@@ -373,5 +373,5 @@ def load_flows_from_definitions(data: dict):
 
 def dynamic_response_fn(messages, next=None):
     def fn(dialog):
-        dialog.send_response(messages, next)
+        return messages, next
     return fn

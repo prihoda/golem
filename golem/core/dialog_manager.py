@@ -135,9 +135,6 @@ class DialogManager:
                         self.move_to("default.root:")
                     self.save_state()
 
-                # FIXME remove this or integrate with check_entity_transition and new "unsupported" states
-                # TODO should "unsupported" be states or just actions?
-
         self.session.interface.processing_end(self.session)
 
         # leave logging message to the end so that the user does not wait
@@ -227,7 +224,8 @@ class DialogManager:
         # send a response if given in return value
         if isinstance(retval, tuple):
             msg, next = retval
-            self.send_response(msg, next)
+            self.send_response(msg)
+            self.move_to(next)
 
     def check_state_transition(self):
         """Checks if entity _state wasn't received in current message (and moves to the state)"""
@@ -396,17 +394,16 @@ class DialogManager:
         session = json.dumps(self.session.to_json())
         self.db.hset("chat_session", self.session.chat_id, session)
 
-    def send_response(self, responses, next=None):
-
-        if not responses:
-            if next:
-                self.move_to(next)
-            return
+    def send_response(self, responses):
+        """
+        Send one or more messages to the user.
+        :param responses:       Instance of MessageElement, str or Iterable.
+        """
 
         logging.info('>>> Sending chatbot message')
 
         if not (isinstance(responses, list) or isinstance(responses, tuple)):
-            return self.send_response([responses], next)
+            return self.send_response([responses])
 
         for response in responses:
             if isinstance(response, str):
@@ -422,9 +419,6 @@ class DialogManager:
         for response in responses:
             # Log the response
             self.logger.log_bot_message(response, self.current_state_name)
-
-        if next is not None:
-            self.move_to(next)  # we can either have ':init' or a bool parameter
 
     def dont_understand(self):
         # TODO log to chatbase
