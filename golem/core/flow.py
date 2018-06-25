@@ -1,4 +1,3 @@
-import logging
 from typing import Optional
 
 import importlib
@@ -6,77 +5,9 @@ import re
 from abc import abstractmethod, ABC
 
 from golem.core.responses import AttachmentMessage
-from .templates import Templates
-
-
-class Flow:
-    def __init__(self, name, dialog, definition):
-        self.name = name
-        self.dialog = dialog
-        self.states = {}
-        self.current_state_name = 'root'
-        self.intent = definition.get('intent') or name
-        for state_name, state_definition in definition['states'].items():
-            self.states[state_name] = State(name + '.' + state_name, dialog=dialog, definition=state_definition)
-
-    def get_state(self, state_name):
-        return self.states.get(state_name)
-
-    def __str__(self):
-        return self.name + ":flow"
 
 
 class State:
-    def __init__(self, name, dialog, definition):
-        from .dialog_manager import DialogManager
-        self.name = name  # type: str
-        self.dialog: DialogManager = dialog  # type: DialogManager
-        self.intent_transitions = definition.get('intent_transitions') or {}
-        self.intent = definition.get('intent')
-        self.init = self.create_action(definition.get('init'))
-        self.accept = self.create_action(definition.get('accept'))
-
-    def create_action(self, definition):
-        if not definition:
-            return None
-        if callable(definition):
-            return definition
-        template = definition.get('template')
-        params = definition.get('params') or None
-        if hasattr(Templates, template):
-            fn = getattr(Templates, template)
-        else:
-            raise ValueError('Template %s not found, create a static method Templates.%s' % (template))
-
-        return fn(**params)
-
-    def get_intent_transition(self, intent):
-        for key, state_name in self.intent_transitions.items():
-            if re.match(key, intent): return state_name
-        return None
-
-    def __str__(self):
-        return self.name + ":state"
-
-    def __repr__(self):
-        return str(self)
-
-
-def require_one_of(entities=[]):
-    def decorator_wrapper(func):
-        def func_wrapper(state):
-            all_entities = entities + ['intent', '_state']
-            if not state.dialog.context.has_any(all_entities, max_age=0):
-                logging.debug('No required entities present, moving to default.root: {}'.format(all_entities))
-                return None, 'default.root:accept'
-            return func(state)
-
-        return func_wrapper
-
-    return decorator_wrapper
-
-
-class NewState:
     def __init__(self, name: str, action, intent=None, requires=None, is_temporary=False, is_blocking=False, supported=None, unsupported=None):
         """
         Construct a conversation state.
@@ -112,19 +43,19 @@ class NewState:
         action = None
         if 'action' in definition:
             action = definition['action']
-            action = NewState.make_action(action, relpath)
-        requires = NewState.parse_requirements(definition.get('require'), relpath)
+            action = State.make_action(action, relpath)
+        requires = State.parse_requirements(definition.get('require'), relpath)
         intent = definition.get("intent")
         is_temporary = definition.get("temporary", False)
         is_blocking = definition.get("block", False)
         supported = set(definition.get("supports", [])).union([r.entity for r in requires if isinstance(r, EntityRequirement)])  # TODO add local entities
 
         if 'unsupported' in definition:
-            unsupported = NewState.make_action(definition.get("unsupported"), relpath)
+            unsupported = State.make_action(definition.get("unsupported"), relpath)
         else:
             unsupported = None
 
-        s = NewState(
+        s = State(
             name=name,
             action=action,
             intent=intent,
@@ -168,7 +99,7 @@ class NewState:
                 raise ValueError("Action {} is undefined or malformed".format(action)) from e
         elif isinstance(action, dict):
             # load a static action, such as text or image
-            return NewState.make_default_action(action)
+            return State.make_default_action(action)
 
         raise ValueError("Action class {} not supported".format(type(action)))
 
@@ -215,8 +146,8 @@ class NewState:
             if req_cond and entity:
                 raise ValueError("Error: either use a requirement entity or a condition, not both")
             elif req_cond:
-                req_cond = NewState.make_action(req_cond, relpath)
-                action = NewState.make_action(req.get("action"), relpath)
+                req_cond = State.make_action(req_cond, relpath)
+                action = State.make_action(req.get("action"), relpath)
                 reqs.append(ConditionRequirement(
                     condition=req_cond,
                     action=action
@@ -226,7 +157,7 @@ class NewState:
                     slot=req.get("slot"),
                     entity=req.get("entity"),
                     filter=req.get("filter"),
-                    action=NewState.make_action(req.get("action"), relpath)
+                    action=State.make_action(req.get("action"), relpath)
                 ))
 
         return reqs
@@ -257,7 +188,7 @@ class NewState:
         return "state:" + self.name
 
 
-class NewFlow:
+class Flow:
     def __init__(self, name: str, states=None, intent=None, unsupported=None):
         """
         Construct a new flow instance.
@@ -268,19 +199,19 @@ class NewFlow:
         """
         self.name = str(name)
         self.states = states or {}
-        self.intent = intent or self.name  # TODO should we also have its name by default?
+        self.intent = intent or self.name
         self.accepted = set()
         self.unsupported = unsupported
 
     @staticmethod
     def load(name, data: dict):
         relpath = data.get("relpath")  # directory of relative imports
-        states = dict(NewState.load(s, relpath) for s in data["states"])
+        states = dict(State.load(s, relpath) for s in data["states"])
         intent = data.get("intent", name)
         unsupported = None
         if 'unsupported' in data:
-            unsupported = NewState.make_action(data['unsupported'], relpath)
-        flow = NewFlow(name=name, states=states, intent=intent, unsupported=unsupported)
+            unsupported = State.make_action(data['unsupported'], relpath)
+        flow = Flow(name=name, states=states, intent=intent, unsupported=unsupported)
         flow.accepted = set(data.get('accepts', {}))
         return flow
 
@@ -290,9 +221,9 @@ class NewFlow:
     def get_state(self, state_name: str):
         return self.states.get(state_name)
 
-    def add_state(self, state: NewState):
+    def add_state(self, state: State):
         """Adds a state to this flow."""
-        if isinstance(state, NewState):
+        if isinstance(state, State):
             self.states[state.name] = state
             return self
         raise ValueError("Argument must be an instance of State")
@@ -366,7 +297,7 @@ class ConditionRequirement(Requirement):
 def load_flows_from_definitions(data: dict):
     flows = {}
     for flow_name, flow_definition in data.items():
-        flow = NewFlow.load(flow_name, flow_definition)
+        flow = Flow.load(flow_name, flow_definition)
         flows[flow_name] = flow
     return flows
 
