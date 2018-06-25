@@ -124,8 +124,15 @@ class DialogManager:
                     self.run_accept(save_identical=True)
                     self.save_state()
                 else:
-                    # TODO run 'unsupported' action but stay here
-                    self.move_to("default.root:")
+                    # run 'unsupported' action of the state
+                    if self.get_state().unsupported:
+                        self.run_action(self.get_state().unsupported)
+                    # if not provided, run 'unsupported' action of the flow
+                    elif self.get_flow().unsupported:
+                        self.run_action(self.get_flow().unsupported)
+                    # if not provided, give up and go to default.root
+                    else:
+                        self.move_to("default.root:")
                     self.save_state()
 
                 # FIXME remove this or integrate with check_entity_transition and new "unsupported" states
@@ -204,22 +211,23 @@ class DialogManager:
             # TODO should they be checked when moving or always?
             # TODO i would go with always as the user's code might depend on the entities being non-null
             requirement = state.get_first_requirement(self.context)
-            # run the requirement
-            retval = requirement.action(dialog=self)
-            # send a response if given in return value
-            if isinstance(retval, tuple):
-                msg, next = retval
-                self.send_response(msg, next)
+            self.run_action(requirement.action)
         else:
             if not state.action:
                 logging.warning('State {} does not have an action.'.format(self.current_state_name))
                 return
-            # run the action
-            retval = state.action(dialog=self)
-            # send a response if given in return value
-            if isinstance(retval, tuple):
-                msg, next = retval
-                self.send_response(msg, next)
+            self.run_action(state.action)
+
+    def run_action(self, fn):
+        if not callable(fn):
+            logging.error("Error: Trying to run a function of type {}".format(type(fn)))
+            return
+        # run the action
+        retval = fn(dialog=self)
+        # send a response if given in return value
+        if isinstance(retval, tuple):
+            msg, next = retval
+            self.send_response(msg, next)
 
     def check_state_transition(self):
         """Checks if entity _state wasn't received in current message (and moves to the state)"""

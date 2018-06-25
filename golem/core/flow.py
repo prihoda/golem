@@ -77,7 +77,7 @@ def require_one_of(entities=[]):
 
 
 class NewState:
-    def __init__(self, name: str, action, intent=None, requires=None, is_temporary=False, is_blocking=False, supported: set=None):
+    def __init__(self, name: str, action, intent=None, requires=None, is_temporary=False, is_blocking=False, supported=None, unsupported=None):
         """
         Construct a conversation state.
         :param name:            name of this state
@@ -89,6 +89,7 @@ class NewState:
                                  and unrecognized messages will move to default.root instead.
         :param is_blocking      disallows all state changes caused by entities
         :param supported        entities that will not trigger a state change (- state can handle them)
+        :param unsupported      an optional function to handle unsupported messages
         """
         self.name = str(name)
         self.action = action
@@ -97,6 +98,7 @@ class NewState:
         self.is_temporary = is_temporary
         self.is_blocking = is_blocking
         self.supported = supported or set()
+        self.unsupported = unsupported
 
     @staticmethod
     def load(definition: dict, relpath: Optional[str]) -> tuple:
@@ -116,6 +118,12 @@ class NewState:
         is_temporary = definition.get("temporary", False)
         is_blocking = definition.get("block", False)
         supported = set(definition.get("supports", [])).union([r.entity for r in requires if isinstance(r, EntityRequirement)])  # TODO add local entities
+
+        if 'unsupported' in definition:
+            unsupported = NewState.make_action(definition.get("unsupported"), relpath)
+        else:
+            unsupported = None
+
         s = NewState(
             name=name,
             action=action,
@@ -123,7 +131,8 @@ class NewState:
             requires=requires,
             is_temporary=is_temporary,
             is_blocking=is_blocking,
-            supported=supported
+            supported=supported,
+            unsupported=unsupported
         )
         return name, s
 
@@ -249,24 +258,29 @@ class NewState:
 
 
 class NewFlow:
-    def __init__(self, name: str, states=None, intent=None):
+    def __init__(self, name: str, states=None, intent=None, unsupported=None):
         """
         Construct a new flow instance.
         :param name:   name of this flow
         :param states: dict of states (optional)
         :param intent: accepted intents regex (optional)
+        :param unsupported      an optional function to handle unsupported messages
         """
         self.name = str(name)
         self.states = states or {}
-        self.intent = intent or self.name
+        self.intent = intent or self.name  # TODO should we also have its name by default?
         self.accepted = set()
+        self.unsupported = unsupported
 
     @staticmethod
     def load(name, data: dict):
         relpath = data.get("relpath")  # directory of relative imports
         states = dict(NewState.load(s, relpath) for s in data["states"])
         intent = data.get("intent", name)
-        flow = NewFlow(name=name, states=states, intent=intent)
+        unsupported = None
+        if 'unsupported' in data:
+            unsupported = NewState.make_action(data['unsupported'], relpath)
+        flow = NewFlow(name=name, states=states, intent=intent, unsupported=unsupported)
         flow.accepted = set(data.get('accepts', {}))
         return flow
 
