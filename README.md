@@ -44,6 +44,7 @@ It's very easy to get started!
 
 Find out how to make your own bot on the **[Wiki](https://github.com/prihoda/golem/wiki)**.
 
+
 ## Authors
 - David Příhoda - [prihoda](https://github.com/prihoda)
 - Jakub Drdák   - [drdakjak](https://github.com/drdakjak)

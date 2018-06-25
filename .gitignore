@@ -67,3 +67,10 @@ celerybeat-schedule
 
 # Vim swapfiles
 *.swp
+
+# Golem files
+manage.py
+dist/
+build/
+.pyre/
+dump.rdb

@@ -85,11 +85,12 @@ class WitExtractor(EntityExtractor):
             db = get_redis()
             db.delete('wit_cache')
 
+
 def teach_wit(wit_token, entity, values, doc=""):
     import requests
-    print('*** TEACHING WIT ***')
+    logging.warning('*** TEACHING WIT ***')
     params = {'v':'20160526'}
-    print('Inserting values of {}'.format(entity))
+    logging.warning('Inserting values of {}'.format(entity))
     rsp = requests.request(
         'PUT',
         'https://api.wit.ai/entities/'+entity,

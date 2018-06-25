@@ -2,3 +2,4 @@ include LICENSE
 include README.md
 recursive-include golem/static *
 recursive-include golem/templates *
+recursive-include golem/bootstrap *

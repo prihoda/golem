@@ -121,7 +121,7 @@ def _process_message(dialog, parsed):
 
 @shared_task
 def fake_move_to_state(chat_id, state: str, entities=()):
-    # TODO
+    # TODO solve chat session saving and restoring
     session = get_redis().hget("chat_session", chat_id)
 
     if not (session and state):
@@ -138,4 +138,4 @@ def fake_move_to_state(chat_id, state: str, entities=()):
     msg_data = {'_state': state}
     for k, v in entities:
         msg_data[k] = [{"value": v}]
-    dialog.process('postback', msg_data)
+    dialog.process('schedule', msg_data)

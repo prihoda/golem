@@ -36,7 +36,7 @@ class TelegramInterface:
             return
         url = base_url + 'setWebhook'
 
-        print('Reverse telegram is: {}'.format(reverse('telegram')))
+        logging.debug('Reverse telegram is: {}'.format(reverse('telegram')))
         callback_url = settings.GOLEM_CONFIG.get('DEPLOY_URL') + reverse('telegram')
 
         payload = {'url': callback_url}

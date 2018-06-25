@@ -16,7 +16,7 @@ else:
 
 GOLEM_CONFIG = {
     "BOTS": {
-        "{APP_NAME}/bots/flows.yaml"
+        "{APP_NAME}/bots/flows.yml"
     },
     "REDIS_URL": redis_url,
     "REDIS": REDIS_CONF,

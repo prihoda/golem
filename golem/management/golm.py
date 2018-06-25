@@ -51,7 +51,7 @@ def install_skeleton(to):
     golem.bootstrap.install_skeleton(to)
 
 
-def golm_init(bot_name=None, clone=False):
+def golm_init(bot_name=None, do_clone=False):
     if not hasattr(sys, 'real_prefix'):
         print("Warning: We recommend using a virtual environment, do you want to continue? [y/n]")
         yesno()
@@ -140,7 +140,7 @@ def golm_start(djangoapp):
     os.kill(redis.pid, signal.SIGTERM)
 
 
-if __name__ == "__main__":
+def main():
     argp = argparse.ArgumentParser(description="Golm framework configuration utility")
     argp.add_argument('command', nargs=1, type=str, help="One of : init, start, help")
     argp.add_argument('djangoapp', nargs='?', help="Name of your django app.")
@@ -165,3 +165,7 @@ if __name__ == "__main__":
         print("Unknown command {}".format(command))
         argp.print_usage()
         exit(1)
+
+
+if __name__ == "__main__":
+    main()

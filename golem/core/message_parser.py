@@ -1,3 +1,5 @@
+import logging
+
 import emoji
 import re
 from django.conf import settings
@@ -8,7 +10,7 @@ ENTITY_EXTRACTORS = settings.GOLEM_CONFIG.get("ENTITY_EXTRACTORS", [])
 def add_default_extractors():
     # compatibility for old chatbots
     if "WIT_TOKEN" in settings.GOLEM_CONFIG:
-        print("Adding wit extractor from wit token")
+        logging.warning("Adding wit extractor from wit token")
         from golem.core.parsing import wit_extractor
         ENTITY_EXTRACTORS.append(wit_extractor.WitExtractor(settings.GOLEM_CONFIG['WIT_TOKEN']))
 
@@ -18,7 +20,7 @@ add_default_extractors()
 
 def parse_text_message(text, num_tries=1):
     if len(ENTITY_EXTRACTORS) <= 0:
-        print('No entity extractors configured!')
+        logging.warning('No entity extractors configured!')
         return {'type': 'message', 'entities': {'_message_text': {'value': text}}}
 
     entities = {}
@@ -28,7 +30,7 @@ def parse_text_message(text, num_tries=1):
         for entity, values in append.items():
             entities.setdefault(entity, []).extend(values)
 
-    print('Extracted entities:', entities)
+    logging.debug('Extracted entities:', entities)
     append = parse_additional_entities(text)
 
     for (entity, value) in re.findall(re.compile(r'/([^/]+)/([^/]+)/'), text):
