@@ -31,4 +31,4 @@ class EntityValue:
         return self.value
 
     def __repr__(self):
-        return "EntityValue:" + str(self.value())
+        return "EntityValue:" + str(self.value)

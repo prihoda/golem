@@ -1,7 +1,6 @@
-from copy import deepcopy
+import time
 
 import re
-import time
 
 
 class EntityQuery:
@@ -20,15 +19,16 @@ class EntityQuery:
         :param abs_time
         :return: self
         """
-        if (messages and (delta or abs_time)) or (delta and abs_time):
+        if (messages is not None and (delta is not None or abs_time is not None)) \
+                or (delta is not None and abs_time is not None):
             raise ValueError("Please use either message count, timedelta or absolute time")
-        if messages:
+        if messages is not None:
             counter_now = self.context.counter
             self.items = filter(lambda x: counter_now - x.counter < messages, self.items)
-        elif delta:
+        elif delta is not None:
             time_min = time.time() - delta.total_seconds()
             self.items = filter(lambda x: x.timestamp > time_min, self.items)
-        elif abs_time:
+        elif abs_time is not None:
             self.items = filter(lambda x: x.timestamp > abs_time, self.items)
         self.items = list(self.items)
         return self
@@ -41,15 +41,16 @@ class EntityQuery:
         :param abs_time
         :return: self
         """
-        if (messages and (delta or abs_time)) or (delta and abs_time):
+        if (messages is not None and (delta is not None or abs_time is not None)) \
+                or (delta is not None and abs_time is not None):
             raise ValueError("Please use either message count, timedelta or absolute time")
-        if messages:
+        if messages is not None:
             counter_now = self.context.counter
             self.items = filter(lambda x: counter_now - x.counter > messages, self.items)
-        elif delta:
+        elif delta is not None:
             time_max = time.time() - delta.total_seconds()
             self.items = filter(lambda x: x.timestamp < time_max, self.items)
-        elif abs_time:
+        elif abs_time is not None:
             self.items = filter(lambda x: x.timestamp < abs_time, self.items)
         self.items = list(self.items)
         return self
@@ -62,15 +63,16 @@ class EntityQuery:
         :param abs_time
         :return: self
         """
-        if (messages and (delta or abs_time)) or (delta and abs_time):
+        if (messages is not None and (delta is not None or abs_time is not None)) \
+                or (delta is not None and abs_time is not None):
             raise ValueError("Please use either message count, timedelta or absolute time")
-        if messages:
+        if messages is not None:
             counter_now = self.context.counter
             self.items = filter(lambda x: counter_now - x.counter == messages, self.items)
-        elif delta:
+        elif delta is not None:
             time_max = time.time() - delta.total_seconds()
             self.items = filter(lambda x: abs(x.timestamp - time_max) < 1.0, self.items)
-        elif abs_time:
+        elif abs_time is not None:
             self.items = filter(lambda x: abs(x.timestamp - abs_time) < 1.0, self.items)
         self.items = list(self.items)
         return self
