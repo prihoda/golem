@@ -222,10 +222,9 @@ class DialogManager:
         # run the action
         retval = fn(dialog=self)
         # send a response if given in return value
-        if isinstance(retval, tuple):
-            msg, next = retval
-            self.send_response(msg)
-            self.move_to(next)
+        if retval and not isinstance(retval, str):
+            raise ValueError("Error: Action must return either None or a state name.")
+        self.move_to(retval)
 
     def check_state_transition(self):
         """Checks if entity _state wasn't received in current message (and moves to the state)"""
