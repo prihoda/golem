@@ -8,7 +8,8 @@ from golem.core.responses import AttachmentMessage
 
 
 class State:
-    def __init__(self, name: str, action, intent=None, requires=None, is_temporary=False, is_blocking=False, supported=None, unsupported=None):
+    def __init__(self, name: str, action, intent=None, requires=None, is_temporary=False, supported=None,
+                 unsupported=None):
         """
         Construct a conversation state.
         :param name:            name of this state
@@ -18,7 +19,6 @@ class State:
         :param is_temporary     whether the action should fire just once,
                                  after that, the state will be used just as a basis for transitions
                                  and unrecognized messages will move to default.root instead.
-        :param is_blocking      disallows all state changes caused by entities
         :param supported        entities that will not trigger a state change (- state can handle them)
         :param unsupported      an optional function to handle unsupported messages
         """
@@ -27,7 +27,6 @@ class State:
         self.intent = intent
         self.requires = requires
         self.is_temporary = is_temporary
-        self.is_blocking = is_blocking
         self.supported = supported or set()
         self.unsupported = unsupported
 
@@ -47,7 +46,6 @@ class State:
         requires = State.parse_requirements(definition.get('require'), relpath)
         intent = definition.get("intent")
         is_temporary = definition.get("temporary", False)
-        is_blocking = definition.get("block", False)
         supported = set(definition.get("supports", [])).union([r.entity for r in requires if isinstance(r, EntityRequirement)])  # TODO add local entities
 
         if 'unsupported' in definition:
@@ -61,7 +59,6 @@ class State:
             intent=intent,
             requires=requires,
             is_temporary=is_temporary,
-            is_blocking=is_blocking,
             supported=supported,
             unsupported=unsupported
         )
@@ -182,7 +179,7 @@ class State:
         return True
 
     def is_supported(self, msg_entities: list) -> bool:
-        return self.is_blocking or not self.supported.isdisjoint(msg_entities)
+        return not self.supported.isdisjoint(msg_entities)
 
     def __str__(self):
         return "state:" + self.name
