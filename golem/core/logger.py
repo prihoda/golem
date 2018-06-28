@@ -25,7 +25,14 @@ class MessageLogging:
         :return:
         """
         # TODO this has to be called async
-        message_text = entities.get("_message_text", "<POSTBACK/SCHEDULE>")
+
+        # get raw message text for display
+        message_text = entities.get("_message_text")
+        if message_text and 'value' in message_text[0]:
+            message_text = message_text[0]["value"]
+        else:
+            message_text = "({})".format(type_)
+
         for logger in MESSAGE_LOGGERS:
             logger.log_user_message(self.dialog, accepted_time, accepted_state, message_text, type_, entities)
 
