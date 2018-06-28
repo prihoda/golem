@@ -4,7 +4,7 @@ def get_interfaces():
     """
     :returns: List of all registered chat interface classes.
     """
-    from webgui.interface import WebGuiInterface
+    from golem.webgui.interface import WebGuiInterface
     from golem.core.interfaces.facebook import FacebookInterface
     from golem.core.interfaces.telegram import TelegramInterface
     from golem.core.interfaces.microsoft import MicrosoftInterface

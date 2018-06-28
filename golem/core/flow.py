@@ -301,5 +301,6 @@ def load_flows_from_definitions(data: dict):
 
 def dynamic_response_fn(messages, next=None):
     def fn(dialog):
-        return messages, next
+        dialog.send(messages)
+        return next
     return fn

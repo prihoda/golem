@@ -390,6 +390,9 @@ class DialogManager:
         :param responses:       Instance of MessageElement, str or Iterable.
         """
 
+        if responses is None:
+            return
+
         logging.info('>>> Sending chatbot message')
 
         if not (isinstance(responses, list) or isinstance(responses, tuple)):
@@ -409,6 +412,9 @@ class DialogManager:
         for response in responses:
             # Log the response
             self.logger.log_bot_message(response, self.current_state_name)
+
+    def send(self, responses):
+        return self.send_response(responses)
 
     def dont_understand(self):
         # TODO log to chatbase
