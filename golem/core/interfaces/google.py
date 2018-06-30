@@ -1,3 +1,5 @@
+import pickle
+
 from golem.core.chat_session import ChatSession, Profile
 from golem.core.message_parser import parse_text_message
 from golem.core.persistence import get_redis
@@ -27,21 +29,19 @@ class GoogleActionsInterface():
 
     @staticmethod
     def post_message(session, response):
+        if not response:
+            return
         GoogleActionsInterface.messages.append(response)
-        get_redis().set("response_for_{id}".format(id=session.chat_id), str(response))  # TODO
+        # TODO clear on received message
+        # TODO don't pickle it
+        data = pickle.dumps(response)
+        get_redis().lpush("response_for_{id}".format(id=session.chat_id), data)
 
     @staticmethod
     def convert_responses(session, responses):
 
-        # TODO
-        response = responses or "Hello world!"
-
-        if isinstance(response, TextMessage):
-            text = response.text
-        elif isinstance(response, str):
-            text = response
-        else:
-            text = "Dummy response"
+        if responses is None:
+            return {}
 
         json_response = {
             "conversationToken": session.meta.get("chat_id"),
@@ -50,16 +50,7 @@ class GoogleActionsInterface():
                 {
                     "inputPrompt": {
                         "richInitialPrompt": {
-                            "items": [
-                                {
-                                    "simpleResponse": {
-                                        "textToSpeech": text,
-                                        # "Howdy! I can tell you fun facts about almost any number, like 42. What do you have in mind?",
-                                        "displayText": text
-                                        # "Howdy! I can tell you fun facts about almost any number. What do you have in mind?"
-                                    }
-                                }
-                            ],
+                            "items": [],
                             "suggestions": []
                         }
                     },
@@ -71,6 +62,16 @@ class GoogleActionsInterface():
                 }
             ]
         }
+
+        for response in responses:
+            if isinstance(response, TextMessage):
+                resp = {
+                    "simpleResponse": {
+                        "textToSpeech": response.text,
+                        "displayText": response.text
+                    }
+                }
+                json_response['expectedInputs'][0]['inputPrompt']['richInitialPrompt']['items'].append(resp)
 
         return json_response
         # return json.dumps(json_response)
@@ -101,8 +102,11 @@ class GoogleActionsInterface():
         session = ChatSession(GoogleActionsInterface, chat_id, meta, profile)
         accept_user_message.delay(session.to_json(), body).get()
         # responses = GoogleActionsInterface.response_cache.get(session.chat_id)
-        responses = get_redis().get("response_for_{id}".format(id=session.chat_id))  # TODO
-        return GoogleActionsInterface.convert_responses(session, responses.decode('utf8'))
+        key = "response_for_{id}".format(id=session.chat_id)
+        num_resp = get_redis().llen(key)
+        responses = get_redis().lrange(key, 0, num_resp)
+        responses = [pickle.loads(resp) for resp in responses]
+        return GoogleActionsInterface.convert_responses(session, responses)
 
     @staticmethod
     def parse_message(msg, num_tries=1):
