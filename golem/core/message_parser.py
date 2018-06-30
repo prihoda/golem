@@ -21,7 +21,7 @@ add_default_extractors()
 def parse_text_message(text, num_tries=1):
     if len(ENTITY_EXTRACTORS) <= 0:
         logging.warning('No entity extractors configured!')
-        return {'type': 'message', 'entities': {'_message_text': {'value': text}}}
+        return {'type': 'message', 'entities': {'_message_text': [{'value': text}]}}
 
     entities = {}
 
