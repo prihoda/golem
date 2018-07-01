@@ -14,7 +14,7 @@ from .models import WebMessageData
 
 def webgui(request):
     if 'uid' not in request.session:
-        return render(request, 'webchat/welcome.html')
+        return render(request, 'golem/webchat/welcome.html')
 
     uid = request.session['uid']
 
@@ -47,7 +47,7 @@ def webgui(request):
         'user_img': settings.GOLEM_CONFIG.get('WEBGUI_USER_IMAGE', 'images/icon_user.png'),
         'bot_img': settings.GOLEM_CONFIG.get('WEBGUI_BOT_IMAGE', 'images/icon_robot.png')
     }
-    return render(request, 'webchat/index.html', context)
+    return render(request, 'golem/webchat/index.html', context)
 
 
 def do_login(request):
