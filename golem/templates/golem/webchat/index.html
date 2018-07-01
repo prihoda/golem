@@ -25,12 +25,12 @@
 
                     {% if m.message.attachment.type == 'template' %}
 
-                        {% if m.message.attachment.payload.template_type == 'buttons' %}
+                        {% if m.message.attachment.payload.template_type == 'button' %}
                             <!-- A message with buttons -->
                             <div class="bubble {% if m.is_response %} left-bubble {% else %} right-bubble {% endif %}">
-                                <span class="text">{{ m.message.text }}</span>
+                                <span class="text">{{ m.message.attachment.payload.text }}</span>
                             <div class="buttons">
-                            {% for b in m.message.attachment.buttons %}
+                            {% for b in m.message.attachment.payload.buttons %}
                                 {% if b.type == 'web_url' %}
                                     <button onclick="gourl('{{ b.url }}')">{{ b.title }}</button>
                                 {% elif b.type == 'postback' %}
