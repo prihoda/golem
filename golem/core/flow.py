@@ -93,7 +93,7 @@ class State:
                 fn = getattr(module, fn_name)
                 return fn
             except Exception as e:
-                raise ValueError("Action {} is undefined or malformed".format(action)) from e
+                raise ValueError("Action {} is undefined, malformed or couldn't be imported".format(action)) from e
         elif isinstance(action, dict):
             # load a static action, such as text or image
             return State.make_default_action(action)
