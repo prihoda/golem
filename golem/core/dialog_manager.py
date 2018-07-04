@@ -352,16 +352,22 @@ class DialogManager:
                     logging.info("Staying in state {} and doing nothing".format(previous_state))
 
             except Exception as e:
-                logging.error('*****************************************************')
-                logging.error('Exception occurred while running action {} of state {}'
-                              .format(action, new_state_name))
-                logging.error('Chat id: {}'.format(self.session.chat_id))
+
+                context_debug = "(can't load context)"
                 try:
-                    context_debug = self.get_state().dialog.context.debug()
-                    logging.error('Context: {}'.format(context_debug))
+                    context_debug = self.context.debug()
                 except:
                     pass
-                logging.exception('Exception follows')
+
+                logging.exception(
+                              '*****************************************************\n'
+                              'Exception occurred while running action {} of state {}\n'
+                              'Chat id: {}\n'
+                              'Context: {}\n'
+                              '*****************************************************'
+                              .format(action, new_state_name, self.session.chat_id, context_debug)
+                )
+
                 if self.error_message_text:
                     self.send_response([self.error_message_text])
 
