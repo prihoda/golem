@@ -22,6 +22,7 @@ class ChatbaseLogger(MessageLogger):
         unsupported = False
         if '_unsupported' in entities and entities['unsupported']:
             unsupported = entities["_unsupported"][0].get('value', False)
+        from django.conf import settings
         payload = {
             "api_key": self.api_key,
             "type": "user",
@@ -32,7 +33,7 @@ class ChatbaseLogger(MessageLogger):
             "intent": dialog.context.intent.current_v(),
             "session_id": state,
             "not_handled": unsupported,
-            "version": "1.0",  # TODO
+            "version": settings.GOLEM_CONFIG.get("VERSION", "1.0")
         }
         response = requests.post(self.base_url + "/message", params=payload)
         if not response.ok:
@@ -40,6 +41,7 @@ class ChatbaseLogger(MessageLogger):
         return response.ok
 
     def log_bot_message(self, dialog, accepted_time, state, message):
+        from django.conf import settings
         payload = {
             "api_key": self.api_key,
             "type": "agent",
@@ -50,7 +52,7 @@ class ChatbaseLogger(MessageLogger):
             "intent": dialog.context.intent.current_v(),
             "session_id": state,
             "not_handled": False,  # only for user messages
-            "version": "1.0",  # TODO
+            "version": settings.GOLEM_CONFIG.get("VERSION", "1.0")
         }
         response = requests.post(self.base_url + "/message", params=payload)
         if not response.ok:
