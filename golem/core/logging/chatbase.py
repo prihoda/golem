@@ -19,6 +19,9 @@ class ChatbaseLogger(MessageLogger):
         return interface  # TODO
 
     def log_user_message(self, dialog, accepted_time, state, message: dict, type, entities):
+        unsupported = False
+        if '_unsupported' in entities and entities['unsupported']:
+            unsupported = entities["_unsupported"][0].get('value', False)
         payload = {
             "api_key": self.api_key,
             "type": "user",
@@ -26,9 +29,9 @@ class ChatbaseLogger(MessageLogger):
             "time_stamp": int(accepted_time * 1000),
             "platform": self._interface_to_platform(dialog.session.interface.name),
             "message": str(message),
-            "intent": dialog.context.get("intent", max_age=0),
+            "intent": dialog.context.intent.current_v(),
             "session_id": state,
-            "not_handled": False,  # TODO
+            "not_handled": unsupported,
             "version": "1.0",  # TODO
         }
         response = requests.post(self.base_url + "/message", params=payload)
@@ -44,9 +47,9 @@ class ChatbaseLogger(MessageLogger):
             "time_stamp": int(accepted_time * 1000),
             "platform": self._interface_to_platform(dialog.session.interface.name),
             "message": str(message),
-            "intent": dialog.context.get("intent", max_age=0),
+            "intent": dialog.context.intent.current_v(),
             "session_id": state,
-            "not_handled": False,  # TODO
+            "not_handled": False,  # only for user messages
             "version": "1.0",  # TODO
         }
         response = requests.post(self.base_url + "/message", params=payload)

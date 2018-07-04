@@ -3,6 +3,7 @@ from unittest import TestCase
 from golem.core.chat_session import ChatSession
 from golem.core.context import Context
 from golem.core.dialog_manager import DialogManager
+from golem.core.entity_value import EntityValue
 from golem.core.interfaces.test import TestInterface
 
 
@@ -50,3 +51,10 @@ class TestContext(TestCase):
         self.assertEquals(context.myentity.older_than(messages=1).latest_v(), 1)
         self.assertEquals(context.myentity.older_than(messages=0).count(), 2)
         self.assertEquals(context.myentity.newer_than(messages=3).count(), 3)
+
+    def test_set(self):
+        context = Context(dialog=self.dialog, entities={}, history=[], counter=0)
+        context.myent = "foo"
+        context.foo = EntityValue(context, "foo", raw={"value": "foo"})
+        self.assertEqual(context.myent.current_v(), "foo")
+        self.assertEqual(context.foo.current_v(), "foo")

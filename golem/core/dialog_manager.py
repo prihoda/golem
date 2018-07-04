@@ -125,6 +125,8 @@ class DialogManager:
                     self.save_state()
                 else:
                     # run 'unsupported' action of the state
+                    entities['_unsupported'] = [{"value": True}]
+
                     if self.get_state().unsupported:
                         self.run_action(self.get_state().unsupported)
                     # if not provided, run 'unsupported' action of the flow

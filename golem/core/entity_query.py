@@ -124,6 +124,16 @@ class EntityQuery:
         item = self.latest()
         return item.value if item else None
 
+    def get(self):
+        return self.latest()
+
+    def get_v(self):
+        return self.latest_v()
+
+    def get_age(self):
+        self.items = sorted(self.items, key=lambda x: x.timestamp, reverse=True)
+        return self.items[0].value, (self.items[0].counter - self.context.counter) if len(self.items) > 0 else None
+
     def current(self):
         item = self.latest()
         return item if item is not None and item.counter == self.context.counter else None
