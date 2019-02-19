@@ -2,6 +2,8 @@
 
 ![PyPI](https://img.shields.io/pypi/v/django-golem.svg)
 
+# This project is no longer maintained. We have moved to [Botshot](https://github.com/botshot/botshot).
+
 <p align="center">
 <img src="https://www.praguevisitor.eu/wp-content/uploads/2018/03/Golem.jpg" width="300"/>
 </p>
